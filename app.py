@@ -1,227 +1,362 @@
-
-from pinecone import Pinecone
-import openai
-from pinecone_text.sparse import BM25Encoder
 import streamlit as st
+from pinecone import Pinecone
 import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from typing import List, Dict
-import re
+import json
+from sentence_transformers import SentenceTransformer
+import time
 
-class JekiDataRAG:
-    def __init__(self):
-        # --- API Keys & Connections ---
-        # Using a hardcoded key is a security risk. Best practice is to use Streamlit secrets.
-        PINECONE_API_KEY = "pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s"
-        
-        try:
-            # Pinecone Setup
-            self.pc = Pinecone(api_key=PINECONE_API_KEY)
-            self.index = self.pc.Index("campaign") # Connecting to your DENSE index
-            
-            # OpenAI Client Setup (Crucial for creating the required dense vectors)
-            self.openai_client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# === Page Configuration ===
+st.set_page_config(
+    page_title="Campaign Data Viewer",
+    page_icon="📊",
+    layout="wide"
+)
 
-        except Exception as e:
-            st.error(f"Failed to connect to services. Please check your API keys in the code and in Streamlit secrets. Error: {e}")
-            self.pc = None
-            self.index = None
-            self.openai_client = None
-        
-        # Report structure definition
-        self.report_structure = [
-            "Screen Details", "Overall Performance Summary", "Daily Summary",
-            "Overall Age and Gender", "Overall Hourly", "Network Summary"
-        ]
+# === Initialize Session State ===
+if 'pinecone_connected' not in st.session_state:
+    st.session_state.pinecone_connected = False
+
+# === Sidebar Configuration ===
+st.sidebar.title("🔧 Configuration")
+
+# Pinecone API Key Input
+api_key = st.sidebar.text_input(
+    "Pinecone API Key", 
+    value="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s",
+    type="password"
+)
+
+index_name = st.sidebar.text_input("Index Name", value="campaign")
+
+# === Connect to Pinecone ===
+@st.cache_resource
+def connect_to_pinecone(api_key, index_name):
+    try:
+        pc = Pinecone(api_key=api_key)
+        index = pc.Index(index_name)
+        model = SentenceTransformer("intfloat/multilingual-e5-large")
+        return pc, index, model
+    except Exception as e:
+        st.error(f"❌ Connection Error: {e}")
+        return None, None, None
+
+# === Available Tab Details ===
+AVAILABLE_TABS = {
+    "Billboard_Details_Tab": [
+        "Overall Performance Summary",
+        "Weekly Summary", 
+        "Daily Summary",
+        "Overall Age and Gender",
+        "Overall Hourly",
+        "Network Summary"
+    ],
+    "Campaign_Details_Tab": [
+        "Campaign Overview",
+        "Budget Allocation",
+        "Target Audience",
+        "Performance Metrics",
+        "ROI Analysis"
+    ],
+    "Analytics_Tab": [
+        "Traffic Analysis",
+        "Conversion Tracking",
+        "User Behavior",
+        "Geographic Data",
+        "Device Analytics"
+    ]
+}
+
+# === Main App ===
+def main():
+    st.title("📊 Campaign Data Individual Record Viewer")
+    st.markdown("---")
     
-    def get_dense_embedding(self, text: str) -> List[float]:
-        """Generates a dense vector embedding for a given text using OpenAI."""
-        if not self.openai_client:
-            st.error("OpenAI client not initialized.")
-            return []
-        try:
-            response = self.openai_client.embeddings.create(
-                model="text-embedding-ada-002", # A standard and effective embedding model
-                input=text
+    # Connect to Pinecone
+    if api_key and index_name:
+        pc, index, model = connect_to_pinecone(api_key, index_name)
+        if index is not None:
+            st.session_state.pinecone_connected = True
+            st.sidebar.success("✅ Connected to Pinecone")
+            
+            # === Tab Selection ===
+            st.header("🎯 Select Tab Details to View")
+            
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                selected_tab = st.selectbox(
+                    "Choose Tab Category:",
+                    list(AVAILABLE_TABS.keys()),
+                    help="Select which tab category you want to explore"
+                )
+            
+            with col2:
+                selected_detail = st.selectbox(
+                    "Choose Specific Detail:",
+                    AVAILABLE_TABS[selected_tab],
+                    help="Select the specific detail you want to view"
+                )
+            
+            st.markdown("---")
+            
+            # === Search Methods ===
+            st.header("🔍 Find Records")
+            
+            search_method = st.radio(
+                "Search Method:",
+                ["Search by Content", "View by Record Index", "Browse All Records"],
+                horizontal=True
             )
-            return response.data[0].embedding
-        except Exception as e:
-            st.error(f"Failed to generate OpenAI embedding: {e}")
-            return []
-
-    def search_by_identifier(self, identifier: str, search_type: str = "auto") -> List[Dict]:
-        """
-        Search by identifier using HYBRID search (dense + sparse) to fix the error.
-        """
-        if not self.index:
-            st.error("Pinecone index is not available.")
-            return []
             
-        # Auto-detect search type
-        if search_type == "auto":
-            if "." in identifier and any(ext in identifier.lower() for ext in ['.csv', '.xlsx', '.pdf']):
-                search_type = "filename"
-            elif identifier.startswith("JPN-JEK") or re.match(r'^[A-Z-]+-\d+-\d+$', identifier):
-                search_type = "reference_id"
+            if search_method == "Search by Content":
+                search_by_content(index, model, selected_tab, selected_detail)
+            elif search_method == "View by Record Index":
+                view_by_index(index, selected_tab, selected_detail)
             else:
-                search_type = "network_id"
-
-        query_text = identifier.lower().replace("-", " ").replace("_", " ")
-
-        # --- STEP 1: Create Sparse Vector (for keywords) ---
-        query_words = query_text.split()
-        sparse_vector = { "indices": list(range(len(query_words))), "values": [1.0] * len(query_words) }
-
-        # --- STEP 2: Create Dense Vector (for semantic meaning) - THIS IS THE FIX ---
-        dense_vector = self.get_dense_embedding(query_text)
-        if not dense_vector:
-            return [] # Stop if embedding generation fails
-
-        try:
-            # --- STEP 3: Perform Hybrid Query ---
-            # Provide BOTH the dense 'vector' and the 'sparse_vector' to the query.
-            results = self.index.query(
-                vector=dense_vector,
-                sparse_vector=sparse_vector,
-                top_k=150, # Get a larger pool of results to filter locally
-                include_metadata=True
-            )
-            
-            # Post-filter for higher accuracy
-            filtered_matches = []
-            for match in results.get('matches', []):
-                metadata = match.get('metadata', {})
-                if search_type == "filename" and identifier.lower() in metadata.get('filename', '').lower():
-                    filtered_matches.append(match)
-                elif search_type == "reference_id" and identifier == metadata.get('reference_id', ''):
-                    filtered_matches.append(match)
-                elif search_type == "network_id" and identifier in str(metadata.get('network_id', '')):
-                     filtered_matches.append(match)
-            
-            # If our specific filter finds nothing, return the top general results from the hybrid search.
-            return filtered_matches if filtered_matches else results.get('matches', [])[:50]
-            
-        except Exception as e:
-            st.error(f"Error during Pinecone search: {str(e)}")
-            return []
-
-    def organize_data_by_tabs(self, matches: List[Dict]) -> Dict[str, List[Dict]]:
-        """Organizes retrieved metadata into the 6 report structure tabs."""
-        organized_data = {tab: [] for tab in self.report_structure}
-        for match in matches:
-            metadata = match.get('metadata', {})
-            # This classification logic can be refined, but it's a good start.
-            if any(key in metadata for key in ['reference_id', 'display_name']):
-                organized_data['Screen Details'].append(metadata)
-            elif any(key in metadata for key in ['age_group', 'gender']):
-                organized_data['Overall Age and Gender'].append(metadata)
-            elif 'date' in metadata:
-                organized_data['Daily Summary'].append(metadata)
-            elif 'hour' in metadata:
-                organized_data['Overall Hourly'].append(metadata)
-            elif any(key in metadata for key in ['network_id', 'campaign_name']):
-                 organized_data['Network Summary'].append(metadata)
-            else: # Default bucket
-                organized_data['Overall Performance Summary'].append(metadata)
-        return organized_data
-    
-    def create_tab_visualizations(self, tab_data: List[Dict], tab_name: str) -> List[go.Figure]:
-        """Creates visualizations for each tab based on the available data."""
-        if not tab_data: return []
-        charts = []
-        df = pd.DataFrame(tab_data).dropna(how='all', axis=1)
-
-        # This function can be expanded with more charts like in SentimentalRAG
-        if tab_name == "Screen Details" and 'reference_id' in df.columns and 'impressions' in df.columns:
-            df_sorted = df.sort_values('impressions', ascending=False).head(15)
-            fig = px.bar(df_sorted, x='reference_id', y='impressions', title='Top 15 Screens by Impressions')
-            fig.update_xaxes(tickangle=45, type='category')
-            charts.append(fig)
-        
-        if tab_name == "Overall Age and Gender" and 'age_group' in df.columns and 'impressions' in df.columns:
-            age_data = df.groupby('age_group')['impressions'].sum().reset_index()
-            fig = px.bar(age_data, x='age_group', y='impressions', title='Impressions by Age Group')
-            charts.append(fig)
-
-        return charts
-
-    def generate_tab_summary(self, tab_data: List[Dict], tab_name: str) -> str:
-        """Generates a markdown summary for each tab."""
-        if not tab_data: return f"**{tab_name}**: No data available for this category."
-        df = pd.DataFrame(tab_data)
-        summary = f"### {tab_name} Summary\n- **Total Records Analyzed**: {len(df)}\n"
-        
-        # This function can be expanded with more detailed summaries
-        if tab_name == "Overall Performance Summary" and 'impressions' in df.columns:
-            summary += f"- **Total Impressions**: {int(df['impressions'].sum()):,}\n"
-
-        return summary
-
-def create_jeki_interface():
-    """Creates the full Streamlit interface."""
-    st.set_page_config(page_title="JEKI Data RAG", page_icon="🚋", layout="wide")
-    
-    st.markdown("""
-    <style>
-    .main-header { font-size: 2.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem;
-                   background: linear-gradient(90deg, #FF6B6B 0%, #4ECDC4 100%);
-                   -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    </style>""", unsafe_allow_html=True)
-    
-    st.markdown('<h1 class="main-header">JEKI Data Integration - Pinecone RAG</h1>', unsafe_allow_html=True)
-    st.markdown("### Search Train Channel & JAD Vision Campaign Data by File Name, Network ID, or Reference ID")
-    
-    if 'jeki_rag' not in st.session_state:
-        st.session_state.jeki_rag = JekiDataRAG()
-    
-    with st.container(border=True):
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            search_query = st.text_input("Search Query:", placeholder="e.g., JAD_Vision_Report.pdf, JPN-JEK-D-00000-00030", label_visibility="collapsed")
-        with col2:
-            search_type = st.selectbox("Search Type:", ["auto", "filename", "network_id", "reference_id"], label_visibility="collapsed")
-        with col3:
-            search_button = st.button("🔍 Search", type="primary", use_container_width=True)
-
-    if search_button and search_query:
-        with st.spinner(f"Searching for '{search_query}'..."):
-            matches = st.session_state.jeki_rag.search_by_identifier(search_query, search_type)
-            
-            if matches:
-                st.success(f"Found {len(matches)} relevant records for '{search_query}'.")
-                organized_data = st.session_state.jeki_rag.organize_data_by_tabs(matches)
-                
-                tab_objects = st.tabs([f"📊 {tab}" for tab in st.session_state.jeki_rag.report_structure])
-                
-                for idx, (tab_name, tab_data) in enumerate(organized_data.items()):
-                    with tab_objects[idx]:
-                        if tab_data:
-                            st.markdown(st.session_state.jeki_rag.generate_tab_summary(tab_data, tab_name))
-                            charts = st.session_state.jeki_rag.create_tab_visualizations(tab_data, tab_name)
-                            for chart in charts: st.plotly_chart(chart, use_container_width=True)
-                            
-                            st.subheader("📋 Detailed Data")
-                            st.dataframe(pd.DataFrame(tab_data), use_container_width=True, height=300)
-                        else:
-                            st.info(f"No data classified under '{tab_name}' for this search.")
-            else:
-                st.warning(f"No results found for '{search_query}'. Please try a different term.")
-    
-    # Sidebar Information
-    st.sidebar.header("🗄️ Database Status")
-    if st.session_state.jeki_rag and st.session_state.jeki_rag.index:
-        try:    
-            stats = st.session_state.jeki_rag.index.describe_index_stats()
-            st.sidebar.metric("Total Vectors", f"{stats.total_vector_count:,}")
-            st.sidebar.metric("Index Fullness", f"{stats.index_fullness:.2%}")
-            st.sidebar.success("🟢 Pinecone Connected")
-        except Exception as e:
-            st.sidebar.error("🔴 Connection Failed")
+                browse_all_records(index, selected_tab, selected_detail)
+        else:
+            st.error("❌ Unable to connect to Pinecone. Please check your credentials.")
     else:
-        st.sidebar.error("🔴 Not Connected")
+        st.warning("⚠️ Please enter Pinecone API key and index name in the sidebar.")
 
+# === Search by Content ===
+def search_by_content(index, model, selected_tab, selected_detail):
+    st.subheader(f"🔍 Search Records for: {selected_tab} → {selected_detail}")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        search_query = st.text_input(
+            "Enter search terms:",
+            placeholder="e.g., Dell campaign, April data, performance metrics..."
+        )
+    
+    with col2:
+        num_results = st.number_input("Results", min_value=1, max_value=20, value=5)
+    
+    if search_query:
+        with st.spinner("🔍 Searching records..."):
+            try:
+                # Generate query embedding
+                query_embedding = model.encode(search_query).tolist()
+                
+                # Search Pinecone
+                results = index.query(
+                    vector=query_embedding,
+                    top_k=num_results,
+                    include_metadata=True
+                )
+                
+                if results['matches']:
+                    st.success(f"✅ Found {len(results['matches'])} matching records")
+                    
+                    # Display results
+                    for i, match in enumerate(results['matches']):
+                        with st.expander(f"📊 Record #{match['id']} - Similarity: {match['score']:.4f}"):
+                            display_record_details(match['metadata'], selected_tab, selected_detail, match['id'])
+                else:
+                    st.warning("❌ No matching records found")
+                    
+            except Exception as e:
+                st.error(f"❌ Search Error: {e}")
+
+# === View by Index ===
+def view_by_index(index, selected_tab, selected_detail):
+    st.subheader(f"📋 View Record by Index: {selected_tab} → {selected_detail}")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        record_index = st.number_input(
+            "Enter Record Index:",
+            min_value=0,
+            value=0,
+            help="Enter the row index number of the record you want to view"
+        )
+    
+    with col2:
+        if st.button("🔍 View Record", type="primary"):
+            with st.spinner("📊 Fetching record..."):
+                try:
+                    response = index.fetch(ids=[str(record_index)])
+                    
+                    if str(record_index) in response['vectors']:
+                        record = response['vectors'][str(record_index)]
+                        st.success(f"✅ Record found!")
+                        display_record_details(record['metadata'], selected_tab, selected_detail, record_index)
+                    else:
+                        st.error(f"❌ Record with index {record_index} not found")
+                        
+                except Exception as e:
+                    st.error(f"❌ Fetch Error: {e}")
+
+# === Browse All Records ===
+def browse_all_records(index, selected_tab, selected_detail):
+    st.subheader(f"📖 Browse Records: {selected_tab} → {selected_detail}")
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        page_size = st.number_input("Records per page:", min_value=1, max_value=20, value=5)
+    
+    with col2:
+        page_number = st.number_input("Page number:", min_value=1, value=1)
+    
+    with col3:
+        if st.button("📖 Load Page", type="primary"):
+            start_idx = (page_number - 1) * page_size
+            end_idx = start_idx + page_size
+            
+            with st.spinner("📊 Loading records..."):
+                try:
+                    record_ids = [str(i) for i in range(start_idx, end_idx)]
+                    response = index.fetch(ids=record_ids)
+                    
+                    st.success(f"✅ Loaded page {page_number}")
+                    
+                    for i in range(start_idx, end_idx):
+                        record_id = str(i)
+                        if record_id in response['vectors']:
+                            record = response['vectors'][record_id]
+                            with st.expander(f"📊 Record #{i}"):
+                                display_record_details(record['metadata'], selected_tab, selected_detail, i)
+                        
+                except Exception as e:
+                    st.error(f"❌ Browse Error: {e}")
+
+# === Display Record Details ===
+def display_record_details(metadata, selected_tab, selected_detail, record_id):
+    """Display detailed record information based on selected tab and detail"""
+    
+    # Header
+    st.markdown(f"### 📋 Record ID: {record_id}")
+    st.markdown(f"**Tab:** {selected_tab} → **Detail:** {selected_detail}")
+    
+    # Create tabs for organized display
+    tab1, tab2, tab3 = st.tabs(["🎯 Filtered View", "📊 All Data", "🔧 Raw JSON"])
+    
+    with tab1:
+        st.markdown(f"#### 🎯 {selected_detail} Details")
+        
+        # Filter data based on selected detail
+        filtered_data = filter_data_by_detail(metadata, selected_tab, selected_detail)
+        
+        if filtered_data:
+            # Display as metrics if numerical
+            if len(filtered_data) <= 4:
+                cols = st.columns(len(filtered_data))
+                for i, (key, value) in enumerate(filtered_data.items()):
+                    with cols[i]:
+                        st.metric(key, value)
+            else:
+                # Display as key-value pairs
+                for key, value in filtered_data.items():
+                    st.write(f"**{key}:** {value}")
+        else:
+            st.info(f"ℹ️ No specific data found for '{selected_detail}'")
+    
+    with tab2:
+        st.markdown("#### 📊 Complete Record Data")
+        
+        # Group data by categories
+        categorized_data = categorize_metadata(metadata)
+        
+        for category, fields in categorized_data.items():
+            if fields:
+                st.markdown(f"**{category}:**")
+                for key, value in fields.items():
+                    st.write(f"• **{key}:** {value}")
+                st.markdown("---")
+    
+    with tab3:
+        st.markdown("#### 🔧 Raw Data (JSON)")
+        st.json(metadata)
+
+# === Filter Data by Detail ===
+def filter_data_by_detail(metadata, tab, detail):
+    """Filter metadata based on selected tab and detail"""
+    filtered = {}
+    
+    # Define keywords for each detail type
+    detail_keywords = {
+        "Overall Performance Summary": ["performance", "summary", "total", "overall", "aggregate"],
+        "Weekly Summary": ["week", "weekly", "w1", "w2", "w3", "w4"],
+        "Daily Summary": ["day", "daily", "date", "d1", "d2", "d3"],
+        "Overall Age and Gender": ["age", "gender", "male", "female", "demographic"],
+        "Overall Hourly": ["hour", "hourly", "time", "h1", "h2", "morning", "evening"],
+        "Network Summary": ["network", "channel", "platform", "media"],
+        "Campaign Overview": ["campaign", "name", "title", "objective"],
+        "Budget Allocation": ["budget", "cost", "spend", "allocation", "investment"],
+        "Target Audience": ["target", "audience", "demographic", "segment"],
+        "Performance Metrics": ["performance", "metrics", "kpi", "results"],
+        "ROI Analysis": ["roi", "return", "profit", "revenue", "conversion"]
+    }
+    
+    keywords = detail_keywords.get(detail, [])
+    
+    # Filter metadata based on keywords
+    for key, value in metadata.items():
+        key_lower = key.lower()
+        if any(keyword in key_lower for keyword in keywords):
+            filtered[key] = value
+    
+    # If no specific matches, try to find related fields
+    if not filtered:
+        for key, value in metadata.items():
+            if any(word in key.lower() for word in detail.lower().split()):
+                filtered[key] = value
+    
+    return filtered
+
+# === Categorize Metadata ===
+def categorize_metadata(metadata):
+    """Categorize metadata fields for better organization"""
+    categories = {
+        "📊 Performance Metrics": {},
+        "📅 Time & Date": {},
+        "👥 Demographics": {},
+        "💰 Financial": {},
+        "🎯 Campaign Info": {},
+        "📱 Technical": {},
+        "📍 Other": {}
+    }
+    
+    for key, value in metadata.items():
+        key_lower = key.lower()
+        
+        if any(word in key_lower for word in ["performance", "metric", "kpi", "result", "score"]):
+            categories["📊 Performance Metrics"][key] = value
+        elif any(word in key_lower for word in ["date", "time", "hour", "day", "week", "month"]):
+            categories["📅 Time & Date"][key] = value
+        elif any(word in key_lower for word in ["age", "gender", "demographic", "audience"]):
+            categories["👥 Demographics"][key] = value
+        elif any(word in key_lower for word in ["cost", "budget", "spend", "revenue", "roi", "price"]):
+            categories["💰 Financial"][key] = value
+        elif any(word in key_lower for word in ["campaign", "name", "title", "objective", "goal"]):
+            categories["🎯 Campaign Info"][key] = value
+        elif any(word in key_lower for word in ["id", "index", "version", "type", "format"]):
+            categories["📱 Technical"][key] = value
+        else:
+            categories["📍 Other"][key] = value
+    
+    # Remove empty categories
+    return {k: v for k, v in categories.items() if v}
+
+# === Sidebar Database Stats ===
+if st.session_state.get('pinecone_connected', False):
+    with st.sidebar:
+        st.markdown("---")
+        st.subheader("📊 Database Info")
+        
+        if st.button("🔄 Refresh Stats"):
+            try:
+                pc, index, model = connect_to_pinecone(api_key, index_name)
+                if index:
+                    stats = index.describe_index_stats()
+                    st.json(stats)
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# === Run App ===
 if __name__ == "__main__":
-    create_jeki_interface()
-
+    main()
