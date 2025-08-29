@@ -1,3 +1,11 @@
+pinecone
+openai
+streamlit
+pandas
+pinecone-text
+scikit-learn
+textblob
+nltk
 plotly
-Tuple
-
+matplotlib
+seaborn
