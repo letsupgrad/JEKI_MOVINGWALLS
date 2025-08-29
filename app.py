@@ -15,8 +15,8 @@ import re
 class FileBasedRAG:
     def __init__(self):
         # Pinecone setup
-        self.pc = Pinecone(api_key="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s")
-        self.index = self.pc.Index("campaign")
+        self.pc = Pinecone(api_key="pcsk_6KzKjJ_JppwNYuBoYwRU2yBnUE3W9n8Cxk4xP2xvAeQeUSBG6gNKj1D3wMcKoXcAmg2FJW")
+        self.index = self.pc.Index("database")
         
         # Initialize BM25 encoder
         self.encoder = BM25Encoder.default()
