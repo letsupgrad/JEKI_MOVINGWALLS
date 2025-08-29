@@ -13,6 +13,156 @@ from textblob import TextBlob
 import re
 from datetime import datetime
 
+# Query for Screen Details
+def get_screen_details():
+    screen_details = {
+        "Network_ID": "Unique identifier for each screen in the network",
+        "Screen_Name": "Name of each screen in the network",
+        "Impressions": "Total number of people who passed by the screen and had the Opportunity To See (OTS)",
+        "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once",
+        "Frequency": "Average number of times a person is exposed to an ad during the specified period"
+    }
+    return screen_details
+
+# Query for Network ID
+def get_network_ids():
+    network_ids = [
+        "JPN-JEK-D-00000-00029", "JPN-JEK-D-00000-00030", "JPN-JEK-D-00000-00031",
+        "JPN-JEK-D-00000-00032", "JPN-JEK-D-00000-00033", "JPN-JEK-D-00000-00034",
+        "JPN-JEK-D-00000-00035", "JPN-JEK-D-00000-00036", "JPN-JEK-D-00000-00039",
+        "JPN-JEK-D-00000-00040", "JPN-JEK-D-00000-00041", "JPN-JEK-D-00000-00042",
+        "JPN-JEK-D-00000-00044", "JPN-JEK-D-00000-00045", "JPN-JEK-D-00000-00046",
+        "JPN-JEK-D-00000-00047", "JPN-JEK-D-00000-00048", "JPN-JEK-D-00000-00049",
+        "JPN-JEK-D-00000-00050", "JPN-JEK-D-00000-00051", "JPN-JEK-D-00000-00052",
+        "JPN-JEK-D-00000-00058", "JPN-JEK-D-00000-00059", "JPN-JEK-D-00000-00060",
+        "JPN-JEK-D-00000-00061"
+    ]
+    return network_ids
+
+# Query for Overall Performance Summary
+def get_overall_performance_summary():
+    performance_summary = {
+        "Sugamo Station Exit": {"Impressions": 49682, "Frequency": 1.66, "Reach": 29929},
+        "Shinjuku Station East Exit": {"Impressions": 61259, "Frequency": 1.11, "Reach": 55188},
+        "Shinjuku Station South Exit": {"Impressions": 63881, "Frequency": 1.00, "Reach": 63881},
+        "Shinjuku Station Koshu-Kaido Exit": {"Impressions": 50093, "Frequency": 1.17, "Reach": 42815},
+        "Shibuya Station Hachiko Exit": {"Impressions": 53843, "Frequency": 1.22, "Reach": 44134},
+        "Gotanda Station": {"Impressions": 21828, "Frequency": 1.46, "Reach": 14951},
+        "Shinagawa Station Central Gate": {"Impressions": 9342, "Frequency": 1.05, "Reach": 8897},
+        "Takanawa Gateway Station": {"Impressions": 3669, "Frequency": 1.60, "Reach": 2293},
+        "Yurakucho Station Central Gate": {"Impressions": 13464, "Frequency": 1.16, "Reach": 11607},
+        "Tokyo Station Marunouchi Underground Passage": {"Impressions": 19369, "Frequency": 1.23, "Reach": 15747},
+        "Tokyo Station Keiyo Passage": {"Impressions": 17793, "Frequency": 1.20, "Reach": 14828},
+        "Akihabara Station New Electric Town Exit": {"Impressions": 50248, "Frequency": 1.13, "Reach": 44467},
+        "Kichijoji Station North-South Free Passage": {"Impressions": 14756, "Frequency": 1.22, "Reach": 12095},
+        "Urawa Station Gate": {"Impressions": 53167, "Frequency": 1.35, "Reach": 39383},
+        "Omiya Station Central Gate": {"Impressions": 43421, "Frequency": 1.42, "Reach": 30578},
+        "Yokohama Station Central Passage": {"Impressions": 103351, "Frequency": 1.16, "Reach": 89096},
+        "JR Yokohama Tower Atrium": {"Impressions": 27946, "Frequency": 1.06, "Reach": 26364},
+        "Takadanobaba Station Smile Vision": {"Impressions": 51685, "Frequency": 1.35, "Reach": 38285},
+        "Ikebukuro Station Central Gate": {"Impressions": 107227, "Frequency": 1.19, "Reach": 90107},
+        "Sakuragicho Station": {"Impressions": 32180, "Frequency": 1.38, "Reach": 23319},
+        "Yokohama Station South Gate": {"Impressions": 69742, "Frequency": 1.43, "Reach": 48771},
+        "Tokyo Station Shinkansen North Transfer Gate": {"Impressions": 4725, "Frequency": 1.00, "Reach": 4725},
+        "Tokyo Station Shinkansen South Transfer Gate": {"Impressions": 4514, "Frequency": 1.00, "Reach": 4514},
+        "Ebisu Station West Exit": {"Impressions": 62157, "Frequency": 1.04, "Reach": 59766},
+        "Akabane Station North Gate": {"Impressions": 31991, "Frequency": 1.01, "Reach": 31674}
+    }
+    return performance_summary
+
+
+# Query for Overall Age and Gender
+def get_overall_age_gender():
+    age_gender_summary = {
+        "Age": {
+            "10-19": {"Percentage": 7.66, "Impressions": 78281},
+            "20-29": {"Percentage": 16.59, "Impressions": 169464},
+            "30-39": {"Percentage": 18.57, "Impressions": 189680},
+            "40-49": {"Percentage": 22.47, "Impressions": 229510},
+            "50-59": {"Percentage": 21.97, "Impressions": 224345},
+            "60+": {"Percentage": 12.73, "Impressions": 130053}
+        },
+        "Gender": {
+            "Male": {"Percentage": 59.56, "Impressions": 608321},
+            "Female": {"Percentage": 40.44, "Impressions": 413012}
+        }
+    }
+    return age_gender_summary
+
+# Query for Overall Hourly
+def get_overall_hourly():
+    hourly_summary = {
+        "5:00 AM": 31302,
+        "6:00 AM": 66273,
+        "7:00 AM": 103107,
+        "8:00 AM": 109565,
+        "9:00 AM": 80853,
+        "10:00 AM": 75642,
+        "11:00 AM": 68930,
+        "12:00 PM": 72156,
+        "1:00 PM": 69874,
+        "2:00 PM": 71203,
+        "3:00 PM": 73850,
+        "4:00 PM": 78945,
+        "5:00 PM": 85670,
+        "6:00 PM": 93263,
+        "7:00 PM": 80449,
+        "8:00 PM": 73650,
+        "9:00 PM": 67344,
+        "10:00 PM": 57298,
+        "11:00 PM": 46850
+    }
+    return hourly_summary
+
+# Query for Report Info
+def get_report_info():
+    report_info = {
+        "Campaign_Duration": {
+            "Start": "2024-03-04",
+            "End": "2024-03-10",
+            "Operating_Hours": {
+                "March 4-8": "Morning and Evening",
+                "March 9-10": "Afternoon"
+            }
+        },
+        "Spot_Duration": "15 seconds",
+        "Report_Generation": {
+            "Generated_On": "2024-04-04",
+            "Reviewed_On": "2024-04-09",
+            "Validated_On": "2024-04-09"
+        },
+        "Report_Structure": [
+            "Screen Details",
+            "Overall Performance Summary",
+            "Daily Summary",
+            "Overall Age and Gender",
+            "Overall Hourly",
+            "Network Summary"
+        ]
+    }
+    return report_info
+
+# Query for Glossary & Notes
+def get_glossary_notes():
+    glossary_notes = {
+        "Glossary": {
+            "Impression": "Total audiences who passed by the screen and had the Opportunity To See (OTS). Includes repeat passers-by.",
+            "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once.",
+            "Frequency": "Average number of times one person passes by the screen location during the specified period."
+        },
+        "Notes": {
+            "Billboard_Details_Tab": [
+                "Overall Performance Summary",
+                "Weekly Summary",
+                "Daily Summary",
+                "Overall Age and Gender",
+                "Overall Hourly",
+                "Network Summary"
+            ]
+        }
+    }
+    return glossary_notes
+   
 class JADVisionRAGSystem:
     def __init__(self):
         """Initialize JAD Vision RAG System with Pinecone connection"""
@@ -29,83 +179,13 @@ class JADVisionRAGSystem:
     def load_jad_vision_data(self) -> Dict[str, Any]:
         """Load JAD Vision Dell campaign report data"""
         return {
-            "report_info": {
-                "Campaign_Duration": {
-                    "Start": "2024-07-07",
-                    "End": "2024-08-03",
-                    "Operating_Hours": "Full day coverage",
-                    "Campaign_Name": "Dell JAD Vision Campaign"
-                },
-                "Spot_Duration": "15 seconds",
-                "Report_Generation": {
-                    "Generated_On": "2024-08-05",
-                    "Reviewed_On": "2024-08-06",
-                    "Validated_On": "2024-08-06"
-                },
-                "Total_Networks": 25,
-                "Campaign_Type": "Digital Out-of-Home (DOOH)"
-            },
-            
-            "screen_details": {
-                "Network_ID": "Unique identifier for each screen in the network",
-                "Screen_Name": "Name of each screen in the network", 
-                "Impressions": "Total number of people who passed by the screen and had the Opportunity To See (OTS)",
-                "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once",
-                "Frequency": "Average number of times a person is exposed to an ad during the specified period"
-            },
-            
-            "network_ids": [
-                "JPN-JEK-D-00000-00029", "JPN-JEK-D-00000-00030", "JPN-JEK-D-00000-00031",
-                "JPN-JEK-D-00000-00032", "JPN-JEK-D-00000-00033", "JPN-JEK-D-00000-00034",
-                "JPN-JEK-D-00000-00035", "JPN-JEK-D-00000-00036", "JPN-JEK-D-00000-00039",
-                "JPN-JEK-D-00000-00040", "JPN-JEK-D-00000-00041", "JPN-JEK-D-00000-00042",
-                "JPN-JEK-D-00000-00044", "JPN-JEK-D-00000-00045", "JPN-JEK-D-00000-00046",
-                "JPN-JEK-D-00000-00047", "JPN-JEK-D-00000-00048", "JPN-JEK-D-00000-00049",
-                "JPN-JEK-D-00000-00050", "JPN-JEK-D-00000-00051", "JPN-JEK-D-00000-00052",
-                "JPN-JEK-D-00000-00058", "JPN-JEK-D-00000-00059", "JPN-JEK-D-00000-00060",
-                "JPN-JEK-D-00000-00061"
-            ],
-            
-            "performance_summary": {
-                "Sugamo Station Exit": {"Impressions": 49682, "Frequency": 1.66, "Reach": 29929},
-                "Shinjuku Station East Exit": {"Impressions": 61259, "Frequency": 1.11, "Reach": 55188},
-                "Shinjuku Station South Exit": {"Impressions": 63881, "Frequency": 1.00, "Reach": 63881},
-                "Shibuya Station": {"Impressions": 75420, "Frequency": 1.25, "Reach": 60336},
-                "Tokyo Station": {"Impressions": 82156, "Frequency": 1.35, "Reach": 60856},
-                "Harajuku Station": {"Impressions": 45280, "Frequency": 1.18, "Reach": 38373},
-                "Ikebukuro Station": {"Impressions": 68940, "Frequency": 1.22, "Reach": 56475},
-                "Ueno Station": {"Impressions": 52370, "Frequency": 1.15, "Reach": 45539}
-            },
-            
-            "age_gender_summary": {
-                "Age": {
-                    "10-19": {"Percentage": 7.66, "Impressions": 78281},
-                    "20-29": {"Percentage": 16.59, "Impressions": 169464},
-                    "30-39": {"Percentage": 18.57, "Impressions": 189680},
-                    "40-49": {"Percentage": 22.47, "Impressions": 229510},
-                    "50-59": {"Percentage": 21.97, "Impressions": 224345},
-                    "60+": {"Percentage": 12.73, "Impressions": 130053}
-                },
-                "Gender": {
-                    "Male": {"Percentage": 59.56, "Impressions": 608321},
-                    "Female": {"Percentage": 40.44, "Impressions": 413012}
-                }
-            },
-            
-            "hourly_summary": {
-                "5:00 AM": 31302, "6:00 AM": 66273, "7:00 AM": 103107, "8:00 AM": 109565,
-                "9:00 AM": 80853, "10:00 AM": 75642, "11:00 AM": 68930, "12:00 PM": 72156,
-                "1:00 PM": 69874, "2:00 PM": 71203, "3:00 PM": 73850, "4:00 PM": 78945,
-                "5:00 PM": 85670, "6:00 PM": 93263, "7:00 PM": 80449, "8:00 PM": 73650,
-                "9:00 PM": 67344, "10:00 PM": 57298, "11:00 PM": 46850
-            },
-            
-            "glossary_notes": {
-                "Impression": "Total audiences who passed by the screen and had the Opportunity To See (OTS). Includes repeat passers-by.",
-                "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once.",
-                "Frequency": "Average number of times one person passes by the screen location during the specified period.",
-                "OTS": "Opportunity To See - when a person is in position to view the digital screen advertisement"
-            }
+            "report_info": get_report_info(),  # Use the defined function
+            "screen_details": get_screen_details(), # Use the defined function
+            "network_ids": get_network_ids(),      # Use the defined function
+            "performance_summary": get_overall_performance_summary(), # Use the defined function
+            "age_gender_summary": get_overall_age_gender(), # Use the defined function
+            "hourly_summary": get_overall_hourly(), # Use the defined function
+            "glossary_notes": get_glossary_notes() # Use the defined function
         }
     
     def search_pinecone_files(self, query: str, top_k: int = 10) -> List[Dict]:
@@ -168,26 +248,27 @@ class JADVisionRAGSystem:
     def is_jad_vision_query(self, query: str) -> bool:
         """Check if query is about JAD Vision Dell campaign"""
         query_lower = query.lower()
-        jad_indicators = ["jad vision", "dell", "7th july", "3rd aug", "campaign"]
+        # Updated indicators based on the provided data for March 4-10, 2024
+        jad_indicators = ["jad vision", "march 4", "march 10", "campaign"]
         return any(indicator in query_lower for indicator in jad_indicators)
     
     def parse_jad_vision_query(self, query: str) -> str:
         """Parse JAD Vision query to determine information type"""
         query_lower = query.lower()
         
-        if any(word in query_lower for word in ["report info", "campaign details", "duration", "dates"]):
+        if any(word in query_lower for word in ["report info", "campaign details", "duration", "dates", "report structure", "generated on", "reviewed on", "validated on"]):
             return "report_info"
-        elif any(word in query_lower for word in ["performance", "impressions", "reach", "frequency"]):
+        elif any(word in query_lower for word in ["performance", "impressions", "reach", "frequency", "overall performance summary"]):
             return "performance"
-        elif any(word in query_lower for word in ["age", "gender", "demographic"]):
+        elif any(word in query_lower for word in ["age", "gender", "demographic", "overall age and gender"]):
             return "demographics"
-        elif any(word in query_lower for word in ["hourly", "time", "hour", "when"]):
+        elif any(word in query_lower for word in ["hourly", "time", "hour", "when", "overall hourly"]):
             return "hourly"
-        elif any(word in query_lower for word in ["screen", "network", "location"]):
+        elif any(word in query_lower for word in ["screen", "network", "location", "screen details", "total referenceid"]):
             return "screens"
         elif any(word in query_lower for word in ["network id", "ids"]):
             return "network_ids"
-        elif any(word in query_lower for word in ["glossary", "definition", "meaning"]):
+        elif any(word in query_lower for word in ["glossary", "definition", "meaning", "notes", "glossary & note"]):
             return "glossary"
         else:
             return "general"
@@ -196,27 +277,53 @@ class JADVisionRAGSystem:
         """Get JAD Vision Dell campaign report information"""
         info = self.report_data["report_info"]
         
+        # Safely access nested dictionary values
+        campaign_name = info.get("Campaign_Duration", {}).get("Campaign_Name", "JAD Vision Campaign")
+        start_date = info.get("Campaign_Duration", {}).get("Start", "N/A")
+        end_date = info.get("Campaign_Duration", {}).get("End", "N/A")
+        
+        # Calculate duration if dates are available and valid
+        duration_str = "N/A"
+        try:
+            if start_date != "N/A" and end_date != "N/A":
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                duration_days = (end_dt - start_dt).days + 1 # Include both start and end day
+                duration_str = f"{duration_days} days"
+        except ValueError:
+            pass # Keep duration_str as N/A if date parsing fails
+
+        operating_hours_march4_8 = info.get("Campaign_Duration", {}).get("Operating_Hours", {}).get("March 4-8", "N/A")
+        operating_hours_march9_10 = info.get("Campaign_Duration", {}).get("Operating_Hours", {}).get("March 9-10", "N/A")
+        
+        spot_duration = info.get("Spot_Duration", "N/A")
+        
+        generated_on = info.get("Report_Generation", {}).get("Generated_On", "N/A")
+        reviewed_on = info.get("Report_Generation", {}).get("Reviewed_On", "N/A")
+        validated_on = info.get("Report_Generation", {}).get("Validated_On", "N/A")
+
+        report_structure = "\n".join([f"• {item}" for item in info.get("Report_Structure", [])])
+        
         details = f"""
-        📊 **JAD Vision Dell Campaign Report**
+        📊 **{campaign_name} Report**
         
         **📅 Campaign Period:**
-        • Start Date: {info['Campaign_Duration']['Start']} (7th July 2024)
-        • End Date: {info['Campaign_Duration']['End']} (3rd August 2024)
-        • Duration: 28 days
-        • Operating Hours: {info['Campaign_Duration']['Operating_Hours']}
+        • Start Date: {start_date}
+        • End Date: {end_date}
+        • Duration: {duration_str}
+        • Operating Hours (March 4-8): {operating_hours_march4_8}
+        • Operating Hours (March 9-10): {operating_hours_march9_10}
         
         **⚙️ Technical Details:**
-        • Spot Duration: {info['Spot_Duration']}
-        • Total Networks: {info['Total_Networks']} digital screens
-        • Campaign Type: {info['Campaign_Type']}
-        • Client: Dell Technologies
+        • Spot Duration: {spot_duration}
         
         **📋 Report Timeline:**
-        • Generated: {info['Report_Generation']['Generated_On']}
-        • Reviewed: {info['Report_Generation']['Reviewed_On']} 
-        • Validated: {info['Report_Generation']['Validated_On']}
+        • Generated: {generated_on}
+        • Reviewed: {reviewed_on} 
+        • Validated: {validated_on}
         
-        **🎯 Campaign Objective:** Digital Out-of-Home advertising across major Japanese transit locations
+        **📝 Report Structure:**
+        {report_structure}
         """
         return details
     
@@ -227,15 +334,18 @@ class JADVisionRAGSystem:
         # Calculate totals
         total_impressions = sum(data["Impressions"] for data in performance.values())
         total_reach = sum(data["Reach"] for data in performance.values())
-        avg_frequency = np.mean([data["Frequency"] for data in performance.values()])
+        
+        # Calculate average frequency carefully to avoid division by zero
+        frequencies = [data["Frequency"] for data in performance.values() if data["Frequency"] is not None]
+        avg_frequency = np.mean(frequencies) if frequencies else 0.0
         
         # Find top performers
         top_location = max(performance.items(), key=lambda x: x[1]["Impressions"])
         
         summary = f"""
-        📈 **JAD Vision Dell Performance Summary**
+        📈 **JAD Vision Campaign Performance Summary**
         
-        **🎯 Campaign Totals (July 7 - Aug 3, 2024):**
+        **🎯 Campaign Totals (March 4 - March 10, 2024):**
         • Total Impressions: {total_impressions:,}
         • Total Unique Reach: {total_reach:,}
         • Average Frequency: {avg_frequency:.2f}
@@ -281,13 +391,19 @@ class JADVisionRAGSystem:
                             marker_color='#2ecc71'), row=2, col=1)
         
         # Performance efficiency (Reach/Impressions ratio)
-        efficiency = [r/i*100 for r, i in zip(reach, impressions)]
+        efficiency = []
+        for r, i in zip(reach, impressions):
+            if i > 0: # Avoid division by zero
+                efficiency.append(r/i*100)
+            else:
+                efficiency.append(0) # Or another suitable default value
+        
         fig.add_trace(go.Scatter(x=frequency, y=efficiency, mode='markers+text',
                                 text=[loc.split()[0] for loc in locations],
                                 name="Efficiency %", 
                                 marker=dict(size=[i/5000 for i in impressions], color='#9b59b6')), row=2, col=2)
         
-        fig.update_layout(height=800, title_text="📊 JAD Vision Dell Campaign - Performance Dashboard")
+        fig.update_layout(height=800, title_text="📊 JAD Vision Campaign - Performance Dashboard")
         fig.update_xaxes(tickangle=45)
         
         return summary, fig
@@ -300,7 +416,7 @@ class JADVisionRAGSystem:
         total_impressions = sum(demographics["Age"][age]["Impressions"] for age in demographics["Age"])
         
         summary = f"""
-        👥 **JAD Vision Dell Demographics Analysis**
+        👥 **JAD Vision Demographics Analysis**
         
         **📊 Age Distribution (Total: {total_impressions:,} impressions):**
         """
@@ -316,9 +432,8 @@ class JADVisionRAGSystem:
         • **Female**: {demographics['Gender']['Female']['Percentage']:.1f}% ({demographics['Gender']['Female']['Impressions']:,} impressions)
         
         **🎯 Key Insights:**
-        • Primary audience: 30-49 years (41% of total reach)
+        • Primary audience: 40-49 years (22.5% of total impressions)
         • Male-skewed audience (59.6% male vs 40.4% female)
-        • Strong working professional demographic
         """
         
         # Create visualizations
@@ -329,7 +444,7 @@ class JADVisionRAGSystem:
         age_values = [demographics["Age"][age]["Impressions"] for age in age_labels]
         
         fig1 = px.pie(values=age_values, names=age_labels,
-                     title="📊 Dell Campaign - Age Distribution",
+                     title="📊 JAD Vision Campaign - Age Distribution",
                      color_discrete_sequence=px.colors.qualitative.Set3)
         fig1.update_traces(textposition='inside', textinfo='percent+label')
         charts.append(fig1)
@@ -373,12 +488,12 @@ class JADVisionRAGSystem:
         total_daily = sum(hourly.values())
         
         summary = f"""
-        🕐 **JAD Vision Dell - Hourly Performance Analysis**
+        🕐 **JAD Vision - Hourly Performance Analysis**
         
         **⏰ Key Performance Hours:**
         • **Peak Hour**: {peak_hour[0]} with {peak_hour[1]:,} impressions
         • **Lowest Hour**: {lowest_hour[0]} with {lowest_hour[1]:,} impressions
-        • **Daily Total**: {total_daily:,} impressions
+        • **Daily Total**: {total_daily:,} impressions (assuming this is a typical daily sum)
         • **Hourly Average**: {total_daily/len(hourly):,.0f} impressions
         
         **🚇 Traffic Patterns:**
@@ -390,7 +505,6 @@ class JADVisionRAGSystem:
         **💡 Optimization Insights:**
         • Best visibility during morning commute (8:00 AM peak)
         • Strong evening performance for brand recall
-        • Weekend patterns may differ (data shows weekday focus)
         """
         
         # Create hourly visualization
@@ -420,17 +534,26 @@ class JADVisionRAGSystem:
             font=dict(color="black", size=12)
         )
         
-        # Add rush hour zones
-        fig.add_vrect(x0="7:00 AM", x1="9:00 AM", 
-                     annotation_text="Morning Rush", annotation_position="top left",
-                     fillcolor="green", opacity=0.1, line_width=0)
+        # Add rush hour zones (adjusting for available data)
+        # Assuming peak hours 7-9 AM and 6-8 PM are "rush hours" from the context
+        morning_rush_start_idx = hours.index("7:00 AM") if "7:00 AM" in hours else None
+        morning_rush_end_idx = hours.index("9:00 AM") if "9:00 AM" in hours else None
+
+        evening_rush_start_idx = hours.index("6:00 PM") if "6:00 PM" in hours else None
+        evening_rush_end_idx = hours.index("8:00 PM") if "8:00 PM" in hours else None
         
-        fig.add_vrect(x0="6:00 PM", x1="8:00 PM",
-                     annotation_text="Evening Rush", annotation_position="top right", 
-                     fillcolor="blue", opacity=0.1, line_width=0)
+        if morning_rush_start_idx is not None and morning_rush_end_idx is not None:
+            fig.add_vrect(x0=hours[morning_rush_start_idx], x1=hours[morning_rush_end_idx],
+                         annotation_text="Morning Rush", annotation_position="top left",
+                         fillcolor="green", opacity=0.1, line_width=0)
+        
+        if evening_rush_start_idx is not None and evening_rush_end_idx is not None:
+            fig.add_vrect(x0=hours[evening_rush_start_idx], x1=hours[evening_rush_end_idx],
+                         annotation_text="Evening Rush", annotation_position="top right", 
+                         fillcolor="blue", opacity=0.1, line_width=0)
         
         fig.update_layout(
-            title="🕒 Dell JAD Vision Campaign - Hourly Impression Patterns",
+            title="🕒 JAD Vision Campaign - Hourly Impression Patterns",
             xaxis_title="Hour of Day",
             yaxis_title="Impressions",
             template="plotly_white",
@@ -447,465 +570,43 @@ class JADVisionRAGSystem:
         network_ids = self.report_data["network_ids"]
         screen_details = self.report_data["screen_details"]
         
+        # Get overall performance summary to list impressions per screen
+        performance_summary = self.report_data["performance_summary"]
+        
         info = f"""
         🌐 **JAD Vision Network Information**
         
         **📺 Screen Network Details:**
-        • **{list(screen_details.keys())[0]}**: {screen_details['Network_ID']}
-        • **{list(screen_details.keys())[1]}**: {screen_details['Screen_Name']}
-        • **{list(screen_details.keys())[2]}**: {screen_details['Impressions']}
-        • **{list(screen_details.keys())[3]}**: {screen_details['Reach']}
-        • **{list(screen_details.keys())[4]}**: {screen_details['Frequency']}
+        • **Network ID**: {screen_details['Network_ID']}
+        • **Screen Name**: {screen_details['Screen_Name']}
+        • **Impressions**: {screen_details['Impressions']}
+        • **Reach**: {screen_details['Reach']}
+        • **Frequency**: {screen_details['Frequency']}
         
         **🆔 Network IDs ({len(network_ids)} screens):**
         """
         
-        # Display network IDs in groups
-        for i in range(0, len(network_ids), 4):
-            group = network_ids[i:i+4]
-            info += f"\n• {' | '.join(group)}"
+        # Display network IDs and their performance
+        for i, network_id in enumerate(network_ids, 1):
+            # Try to find the screen name corresponding to the network_id
+            screen_name = "Unknown Location"
+            for name, data in performance_summary.items():
+                # This requires a mapping between network_id and screen name if not directly available
+                # For now, we'll just use the network_id and try to get performance data
+                if name.replace(" ", "") in network_id.replace(" ", ""): # Simple heuristic
+                    screen_name = name
+                    break
+            
+            perf_data = performance_summary.get(screen_name, {"Impressions": "N/A", "Reach": "N/A", "Frequency": "N/A"})
+            
+            info += f"\n{i}. **{network_id}** ({screen_name}): Impressions: {perf_data['Impressions']:,}, Reach: {perf_data['Reach']:,}, Frequency: {perf_data['Frequency']:.2f}"
         
         info += f"""
         
         **📍 Network Coverage:**
-        • Major train stations across Japan
+        • Major train stations across Japan (as indicated by the specific station names)
         • High-traffic commuter locations
         • Premium digital screen placements
-        • Strategic visibility points for Dell brand exposure
+        • Strategic visibility points for brand exposure
         """
         
-        return info
-    
-    def get_glossary_info(self) -> str:
-        """Get glossary and definitions"""
-        glossary = self.report_data["glossary_notes"]
-        
-        info = f"""
-        📚 **JAD Vision Campaign Glossary**
-        
-        **📖 Key Definitions:**
-        """
-        
-        for term, definition in glossary.items():
-            info += f"\n• **{term}**: {definition}"
-        
-        info += f"""
-        
-        **🏢 Additional Context:**
-        • **JAD Vision**: Premium digital out-of-home advertising network in Japan
-        • **Dell Campaign**: Technology brand awareness campaign
-        • **DOOH**: Digital Out-of-Home advertising
-        • **Transit Advertising**: Advertising in transportation hubs and stations
-        • **Campaign KPIs**: Impressions, Reach, and Frequency metrics
-        """
-        
-        return info
-    
-    def process_query(self, user_query: str) -> Dict[str, Any]:
-        """Main query processing function"""
-        
-        # Analyze query sentiment
-        sentiment = self.analyze_sentiment(user_query)
-        
-        # Check if it's a JAD Vision query
-        if self.is_jad_vision_query(user_query):
-            # Handle JAD Vision specific queries
-            query_type = self.parse_jad_vision_query(user_query)
-            
-            response = {
-                "source": "jad_vision_report",
-                "query_type": query_type,
-                "sentiment": sentiment,
-                "success": True
-            }
-            
-            if query_type == "report_info":
-                response["details"] = self.get_jad_vision_report_info()
-                response["title"] = "📊 Dell Campaign Report Information"
-                
-            elif query_type == "performance":
-                details, chart = self.get_jad_vision_performance()
-                response["details"] = details
-                response["chart"] = chart
-                response["title"] = "📈 Campaign Performance Summary"
-                
-            elif query_type == "demographics":
-                details, charts = self.get_jad_vision_demographics()
-                response["details"] = details
-                response["charts"] = charts
-                response["title"] = "👥 Demographic Analysis"
-                
-            elif query_type == "hourly":
-                details, chart = self.get_jad_vision_hourly()
-                response["details"] = details
-                response["chart"] = chart
-                response["title"] = "🕐 Hourly Performance Analysis"
-                
-            elif query_type in ["screens", "network_ids"]:
-                response["details"] = self.get_network_info()
-                response["title"] = "🌐 Network & Screen Information"
-                
-            elif query_type == "glossary":
-                response["details"] = self.get_glossary_info()
-                response["title"] = "📚 Campaign Glossary"
-                
-            else:  # general
-                response["details"] = f"""
-                📋 **JAD Vision Dell Campaign Overview**
-                
-                **Campaign Summary:**
-                • Period: July 7 - August 3, 2024 (28 days)
-                • Client: Dell Technologies
-                • Networks: 25 digital screens across Japan
-                • Format: 15-second digital advertisements
-                
-                **📊 Available Report Sections:**
-                1. **Report Info** - Campaign details and timeline
-                2. **Performance Summary** - Impressions, reach, frequency data  
-                3. **Demographics** - Age and gender breakdown
-                4. **Hourly Analysis** - Time-based performance patterns
-                5. **Network Information** - Screen locations and IDs
-                6. **Glossary** - Definitions and terminology
-                
-                **💡 Ask me about any specific section!**
-                Examples:
-                • "JAD Vision Dell performance summary"
-                • "JAD Vision Dell demographics" 
-                • "JAD Vision Dell hourly analysis"
-                """
-                response["title"] = "📊 JAD Vision Dell Campaign"
-            
-            return response
-        
-        else:
-            # Search Pinecone for other files
-            pinecone_results = self.search_pinecone_files(user_query)
-            
-            if pinecone_results:
-                # Format Pinecone results
-                formatted_results = self.format_pinecone_results(pinecone_results)
-                return {
-                    "source": "pinecone_files", 
-                    "success": True,
-                    "title": "🔍 File Search Results",
-                    "details": formatted_results,
-                    "sentiment": sentiment,
-                    "num_results": len(pinecone_results)
-                }
-            else:
-                return {
-                    "source": "no_results",
-                    "success": False,
-                    "message": "No matching files found in database.",
-                    "suggestion": "Try asking about 'JAD Vision Dell campaign' for report data, or check your query spelling."
-                }
-    
-    def format_pinecone_results(self, results: List[Dict]) -> str:
-        """Format Pinecone search results"""
-        if not results:
-            return "❌ No results found in the file database."
-        
-        formatted = f"📁 **Found {len(results)} relevant files/documents:**\n\n"
-        
-        for i, result in enumerate(results, 1):
-            metadata = result.get('metadata', {})
-            score = result.get('score', 0)
-            
-            formatted += f"""
-            **📄 Result {i}** (Relevance: {score:.3f})
-            """
-            
-            # Display available metadata
-            if metadata:
-                for key, value in metadata.items():
-                    if isinstance(value, (str, int, float)):
-                        formatted += f"\n• **{key.title()}**: {value}"
-            
-            formatted += "\n" + "─" * 50 + "\n"
-        
-        return formatted
-
-def create_jad_vision_interface():
-    """Create the main JAD Vision interface"""
-    
-    st.set_page_config(
-        page_title="JAD Vision Dell Campaign System",
-        page_icon="📊",
-        layout="wide"
-    )
-    
-    # Custom CSS
-    st.markdown("""
-    <style>
-    .main-header {
-        background: linear-gradient(90deg, #007DB8, #0078D4, #106EBE);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-size: 2.8rem;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .dell-blue {
-        color: #007DB8;
-        font-weight: bold;
-    }
-    .info-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1.5rem;
-        border-radius: 15px;
-        border-left: 5px solid #007DB8;
-        margin: 1rem 0;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #007DB8 0%, #106EBE 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        color: white;
-        margin: 0.5rem;
-    }
-    .pinecone-status {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        color: white;
-        margin: 1rem 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Header
-    st.markdown('<h1 class="main-header">📊 JAD Vision Dell Campaign System</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="dell-blue" style="text-align: center; font-size: 1.2rem;">Pinecone-Powered Report Query System | July 7 - August 3, 2024</p>', unsafe_allow_html=True)
-    
-    # Initialize system
-    if 'jad_system' not in st.session_state:
-        st.session_state.jad_system = JADVisionRAGSystem()
-    
-    # Sidebar with Pinecone status and examples
-    st.sidebar.header("🔌 System Status")
-    
-    # Pinecone connection status
-    try:
-        stats = st.session_state.jad_system.index.describe_index_stats()
-        st.sidebar.markdown(f"""
-        <div class="pinecone-status">
-            <h4>🌲 Pinecone Database</h4>
-            <p><strong>Status:</strong> ✅ Connected</p>
-            <p><strong>Vectors:</strong> {stats.total_vector_count:,}</p>
-            <p><strong>Capacity:</strong> {stats.index_fullness:.1%}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    except Exception as e:
-        st.sidebar.error(f"❌ Pinecone Connection Error: {str(e)}")
-    
-    st.sidebar.markdown("---")
-    
-    # JAD Vision example queries
-    st.sidebar.header("📋 JAD Vision Examples")
-    jad_examples = [
-        "JAD Vision 7th July - 3rd Aug Dell report info",
-        "JAD Vision Dell performance summary",
-        "JAD Vision Dell demographics breakdown", 
-        "JAD Vision Dell hourly analysis",
-        "JAD Vision Dell network IDs",
-        "JAD Vision Dell screen details",
-        "JAD Vision Dell glossary definitions"
-    ]
-    
-    for query in jad_examples:
-        if st.sidebar.button(f"🎯 {query}", key=f"jad_{hash(query)}"):
-            st.session_state.current_query = query
-    
-    st.sidebar.markdown("---")
-    
-    # General file search examples
-    st.sidebar.header("📁 File Search Examples")
-    file_examples = [
-        "Campaign performance data",
-        "Marketing analytics report",
-        "Customer engagement metrics",
-        "Brand awareness study"
-    ]
-    
-    for query in file_examples:
-        if st.sidebar.button(f"🔍 {query}", key=f"file_{hash(query)}"):
-            st.session_state.current_query = query
-    
-    # Main query interface
-    st.markdown("### 🔍 Query Interface")
-    
-    col1, col2 = st.columns([5, 1])
-    
-    with col1:
-        user_query = st.text_input(
-            "💬 Enter your query:",
-            value=st.session_state.get('current_query', ''),
-            placeholder="e.g., JAD Vision 7th July - 3rd Aug Dell report info"
-        )
-    
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        search_button = st.button("🚀 Search", type="primary")
-    
-    # Process query
-    if (search_button and user_query) or st.session_state.get('current_query'):
-        query_to_process = user_query or st.session_state.get('current_query', '')
-        
-        # Clear the session state query after using it
-        if 'current_query' in st.session_state:
-            del st.session_state.current_query
-        
-        with st.spinner("🔍 Processing your query..."):
-            try:
-                response = st.session_state.jad_system.process_query(query_to_process)
-                
-                if response["success"]:
-                    
-                    # Show query sentiment
-                    if "sentiment" in response:
-                        sentiment = response["sentiment"]
-                        st.markdown(f"""
-                        <div style="background: {sentiment.get('color', '#FFFF00')}; 
-                                   padding: 0.5rem; border-radius: 5px; margin: 1rem 0; text-align: center;">
-                            <strong>Query Emotion: {sentiment.get('emotion', '😐 Neutral')}</strong>
-                            (Confidence: {sentiment.get('confidence', 50):.0f}%)
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Display title and source indicator
-                    source_emoji = "📊" if response["source"] == "jad_vision_report" else "📁"
-                    st.subheader(f"{source_emoji} {response['title']}")
-                    
-                    # Show data source
-                    if response["source"] == "jad_vision_report":
-                        st.success("✅ Data source: JAD Vision Dell Campaign Report")
-                    elif response["source"] == "pinecone_files":
-                        st.info(f"📁 Data source: Pinecone Database ({response.get('num_results', 0)} files found)")
-                    
-                    # Display details
-                    st.markdown(f'<div class="info-card">{response["details"]}</div>', unsafe_allow_html=True)
-                    
-                    # Display visualizations
-                    if "chart" in response:
-                        st.plotly_chart(response["chart"], use_container_width=True)
-                    
-                    if "charts" in response:
-                        if len(response["charts"]) > 1:
-                            # Display multiple charts in columns
-                            if len(response["charts"]) == 2:
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.plotly_chart(response["charts"][0], use_container_width=True)
-                                with col2:
-                                    st.plotly_chart(response["charts"][1], use_container_width=True)
-                            else:
-                                for chart in response["charts"]:
-                                    st.plotly_chart(chart, use_container_width=True)
-                        else:
-                            st.plotly_chart(response["charts"][0], use_container_width=True)
-                
-                else:
-                    st.warning(f"⚠️ {response['message']}")
-                    if "suggestion" in response:
-                        st.info(f"💡 {response['suggestion']}")
-                        
-            except Exception as e:
-                st.error(f"❌ Error processing query: {str(e)}")
-                st.error("Please check your Pinecone connection and try again.")
-    
-    # Quick metrics display
-    st.markdown("---")
-    st.markdown("### 📊 Quick Campaign Stats")
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    # Calculate quick stats from report data
-    total_impressions = sum(data["Impressions"] for data in st.session_state.jad_system.report_data["performance_summary"].values())
-    total_reach = sum(data["Reach"] for data in st.session_state.jad_system.report_data["performance_summary"].values())
-    avg_frequency = np.mean([data["Frequency"] for data in st.session_state.jad_system.report_data["performance_summary"].values()])
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>{total_impressions:,}</h3>
-            <p>Total Impressions</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>{total_reach:,}</h3>
-            <p>Total Reach</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>{avg_frequency:.2f}</h3>
-            <p>Avg Frequency</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>28</h3>
-            <p>Campaign Days</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>25</h3>
-            <p>Screen Networks</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Help and usage guide
-    with st.expander("❓ How to Use This System"):
-        st.markdown("""
-        ## 🎯 **Two Types of Searches:**
-        
-        ### 📊 **JAD Vision Dell Campaign Queries**
-        **Always include "JAD Vision" and "Dell" in your query**
-        
-        **Available Information:**
-        - **Report Info**: `"JAD Vision Dell report info"` - Campaign details and timeline
-        - **Performance**: `"JAD Vision Dell performance"` - Impressions, reach, frequency
-        - **Demographics**: `"JAD Vision Dell demographics"` - Age and gender breakdown  
-        - **Hourly**: `"JAD Vision Dell hourly analysis"` - Time-based patterns
-        - **Networks**: `"JAD Vision Dell network IDs"` - Screen locations and identifiers
-        - **Glossary**: `"JAD Vision Dell glossary"` - Definitions and terminology
-        
-        ### 📁 **File Database Searches**
-        **Search any other files stored in Pinecone database**
-        
-        Examples:
-        - `"Marketing campaign results"`
-        - `"Customer analytics data"`
-        - `"Brand performance metrics"`
-        
-        ## 💡 **Tips:**
-        - Be specific in your queries for better results
-        - Use exact phrases like "JAD Vision Dell" for campaign data
-        - Check Pinecone connection status in sidebar
-        - View example queries in the sidebar for guidance
-        """)
-    
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style='text-align: center; color: #666; padding: 1rem;'>
-        <p><strong>🌲 Pinecone-Powered</strong> | <strong>📊 JAD Vision Integration</strong> | <strong>🚀 Real-time Analytics</strong></p>
-        <p>Dell Digital Out-of-Home Campaign Analytics System</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    create_jad_vision_interface()
