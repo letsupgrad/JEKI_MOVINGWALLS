@@ -7,606 +7,503 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Optional
 import time
-from textblob import TextBlob
+import json
 import re
-from datetime import datetime
 
-# Query for Screen Details
-def get_screen_details():
-    screen_details = {
-        "Network_ID": "Unique identifier for each screen in the network",
-        "Screen_Name": "Name of each screen in the network",
-        "Impressions": "Total number of people who passed by the screen and had the Opportunity To See (OTS)",
-        "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once",
-        "Frequency": "Average number of times a person is exposed to an ad during the specified period"
-    }
-    return screen_details
-
-# Query for Network ID
-def get_network_ids():
-    network_ids = [
-        "JPN-JEK-D-00000-00029", "JPN-JEK-D-00000-00030", "JPN-JEK-D-00000-00031",
-        "JPN-JEK-D-00000-00032", "JPN-JEK-D-00000-00033", "JPN-JEK-D-00000-00034",
-        "JPN-JEK-D-00000-00035", "JPN-JEK-D-00000-00036", "JPN-JEK-D-00000-00039",
-        "JPN-JEK-D-00000-00040", "JPN-JEK-D-00000-00041", "JPN-JEK-D-00000-00042",
-        "JPN-JEK-D-00000-00044", "JPN-JEK-D-00000-00045", "JPN-JEK-D-00000-00046",
-        "JPN-JEK-D-00000-00047", "JPN-JEK-D-00000-00048", "JPN-JEK-D-00000-00049",
-        "JPN-JEK-D-00000-00050", "JPN-JEK-D-00000-00051", "JPN-JEK-D-00000-00052",
-        "JPN-JEK-D-00000-00058", "JPN-JEK-D-00000-00059", "JPN-JEK-D-00000-00060",
-        "JPN-JEK-D-00000-00061"
-    ]
-    return network_ids
-
-# Query for Overall Performance Summary
-def get_overall_performance_summary():
-    performance_summary = {
-        "Sugamo Station Exit": {"Impressions": 49682, "Frequency": 1.66, "Reach": 29929},
-        "Shinjuku Station East Exit": {"Impressions": 61259, "Frequency": 1.11, "Reach": 55188},
-        "Shinjuku Station South Exit": {"Impressions": 63881, "Frequency": 1.00, "Reach": 63881},
-        "Shinjuku Station Koshu-Kaido Exit": {"Impressions": 50093, "Frequency": 1.17, "Reach": 42815},
-        "Shibuya Station Hachiko Exit": {"Impressions": 53843, "Frequency": 1.22, "Reach": 44134},
-        "Gotanda Station": {"Impressions": 21828, "Frequency": 1.46, "Reach": 14951},
-        "Shinagawa Station Central Gate": {"Impressions": 9342, "Frequency": 1.05, "Reach": 8897},
-        "Takanawa Gateway Station": {"Impressions": 3669, "Frequency": 1.60, "Reach": 2293},
-        "Yurakucho Station Central Gate": {"Impressions": 13464, "Frequency": 1.16, "Reach": 11607},
-        "Tokyo Station Marunouchi Underground Passage": {"Impressions": 19369, "Frequency": 1.23, "Reach": 15747},
-        "Tokyo Station Keiyo Passage": {"Impressions": 17793, "Frequency": 1.20, "Reach": 14828},
-        "Akihabara Station New Electric Town Exit": {"Impressions": 50248, "Frequency": 1.13, "Reach": 44467},
-        "Kichijoji Station North-South Free Passage": {"Impressions": 14756, "Frequency": 1.22, "Reach": 12095},
-        "Urawa Station Gate": {"Impressions": 53167, "Frequency": 1.35, "Reach": 39383},
-        "Omiya Station Central Gate": {"Impressions": 43421, "Frequency": 1.42, "Reach": 30578},
-        "Yokohama Station Central Passage": {"Impressions": 103351, "Frequency": 1.16, "Reach": 89096},
-        "JR Yokohama Tower Atrium": {"Impressions": 27946, "Frequency": 1.06, "Reach": 26364},
-        "Takadanobaba Station Smile Vision": {"Impressions": 51685, "Frequency": 1.35, "Reach": 38285},
-        "Ikebukuro Station Central Gate": {"Impressions": 107227, "Frequency": 1.19, "Reach": 90107},
-        "Sakuragicho Station": {"Impressions": 32180, "Frequency": 1.38, "Reach": 23319},
-        "Yokohama Station South Gate": {"Impressions": 69742, "Frequency": 1.43, "Reach": 48771},
-        "Tokyo Station Shinkansen North Transfer Gate": {"Impressions": 4725, "Frequency": 1.00, "Reach": 4725},
-        "Tokyo Station Shinkansen South Transfer Gate": {"Impressions": 4514, "Frequency": 1.00, "Reach": 4514},
-        "Ebisu Station West Exit": {"Impressions": 62157, "Frequency": 1.04, "Reach": 59766},
-        "Akabane Station North Gate": {"Impressions": 31991, "Frequency": 1.01, "Reach": 31674}
-    }
-    return performance_summary
-
-
-# Query for Overall Age and Gender
-def get_overall_age_gender():
-    age_gender_summary = {
-        "Age": {
-            "10-19": {"Percentage": 7.66, "Impressions": 78281},
-            "20-29": {"Percentage": 16.59, "Impressions": 169464},
-            "30-39": {"Percentage": 18.57, "Impressions": 189680},
-            "40-49": {"Percentage": 22.47, "Impressions": 229510},
-            "50-59": {"Percentage": 21.97, "Impressions": 224345},
-            "60+": {"Percentage": 12.73, "Impressions": 130053}
-        },
-        "Gender": {
-            "Male": {"Percentage": 59.56, "Impressions": 608321},
-            "Female": {"Percentage": 40.44, "Impressions": 413012}
-        }
-    }
-    return age_gender_summary
-
-# Query for Overall Hourly
-def get_overall_hourly():
-    hourly_summary = {
-        "5:00 AM": 31302,
-        "6:00 AM": 66273,
-        "7:00 AM": 103107,
-        "8:00 AM": 109565,
-        "9:00 AM": 80853,
-        "10:00 AM": 75642,
-        "11:00 AM": 68930,
-        "12:00 PM": 72156,
-        "1:00 PM": 69874,
-        "2:00 PM": 71203,
-        "3:00 PM": 73850,
-        "4:00 PM": 78945,
-        "5:00 PM": 85670,
-        "6:00 PM": 93263,
-        "7:00 PM": 80449,
-        "8:00 PM": 73650,
-        "9:00 PM": 67344,
-        "10:00 PM": 57298,
-        "11:00 PM": 46850
-    }
-    return hourly_summary
-
-# Query for Report Info
-def get_report_info():
-    report_info = {
-        "Campaign_Duration": {
-            "Start": "2024-03-04",
-            "End": "2024-03-10",
-            "Operating_Hours": {
-                "March 4-8": "Morning and Evening",
-                "March 9-10": "Afternoon"
-            }
-        },
-        "Spot_Duration": "15 seconds",
-        "Report_Generation": {
-            "Generated_On": "2024-04-04",
-            "Reviewed_On": "2024-04-09",
-            "Validated_On": "2024-04-09"
-        },
-        "Report_Structure": [
+class FileBasedRAG:
+    def __init__(self):
+        # Pinecone setup
+        self.pc = Pinecone(api_key="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s")
+        self.index = self.pc.Index("campaign")
+        
+        # Initialize BM25 encoder
+        self.encoder = BM25Encoder.default()
+        
+        # Report structure definition
+        self.report_structure = [
             "Screen Details",
-            "Overall Performance Summary",
+            "Overall Performance Summary", 
             "Daily Summary",
             "Overall Age and Gender",
             "Overall Hourly",
             "Network Summary"
         ]
-    }
-    return report_info
-
-# Query for Glossary & Notes
-def get_glossary_notes():
-    glossary_notes = {
-        "Glossary": {
-            "Impression": "Total audiences who passed by the screen and had the Opportunity To See (OTS). Includes repeat passers-by.",
-            "Reach": "Unique count of audiences who passed by the screen and had the OTS at least once.",
-            "Frequency": "Average number of times one person passes by the screen location during the specified period."
-        },
-        "Notes": {
-            "Billboard_Details_Tab": [
-                "Overall Performance Summary",
-                "Weekly Summary",
-                "Daily Summary",
-                "Overall Age and Gender",
-                "Overall Hourly",
-                "Network Summary"
-            ]
-        }
-    }
-    return glossary_notes
-   
-class JADVisionRAGSystem:
-    def __init__(self):
-        """Initialize JAD Vision RAG System with Pinecone connection"""
-        # Pinecone setup for file storage 🔌
-        self.pc = Pinecone(api_key="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s")
-        self.index = self.pc.Index("campaign")
-        
-        # Initialize BM25 encoder for semantic search
-        self.encoder = BM25Encoder.default()
-        
-        # Load JAD Vision report data
-        self.report_data = self.load_jad_vision_data()
-        
-    def load_jad_vision_data(self) -> Dict[str, Any]:
-        """Load JAD Vision Dell campaign report data"""
-        return {
-            "report_info": get_report_info(),  # Use the defined function
-            "screen_details": get_screen_details(), # Use the defined function
-            "network_ids": get_network_ids(),      # Use the defined function
-            "performance_summary": get_overall_performance_summary(), # Use the defined function
-            "age_gender_summary": get_overall_age_gender(), # Use the defined function
-            "hourly_summary": get_overall_hourly(), # Use the defined function
-            "glossary_notes": get_glossary_notes() # Use the defined function
-        }
     
-    def search_pinecone_files(self, query: str, top_k: int = 10) -> List[Dict]:
-        """Search files stored in Pinecone vector database"""
+    def search_by_identifier(self, identifier: str, search_type: str = "auto") -> List[Dict]:
+        """
+        Search by file name, network ID, or reference ID
+        
+        Args:
+            identifier: The search term (filename, network_id, reference_id)
+            search_type: "filename", "network_id", "reference_id", or "auto"
+        """
+        
+        # Determine search type automatically if not specified
+        if search_type == "auto":
+            if "." in identifier and any(ext in identifier.lower() for ext in ['.csv', '.xlsx', '.json', '.txt']):
+                search_type = "filename"
+            elif identifier.isdigit() or re.match(r'^[A-Z0-9_-]+$', identifier):
+                search_type = "network_id"
+            else:
+                search_type = "reference_id"
+        
+        # Create search filters based on type
+        filter_dict = {}
+        if search_type == "filename":
+            filter_dict = {"filename": {"$eq": identifier}}
+        elif search_type == "network_id":
+            filter_dict = {"network_id": {"$eq": identifier}}
+        elif search_type == "reference_id":
+            filter_dict = {"reference_id": {"$eq": identifier}}
+        
+        # Search with sparse vector for better matching
+        query_words = identifier.lower().split()
+        sparse_vector = {
+            "indices": list(range(min(10, len(query_words)))),
+            "values": [0.8 - (i * 0.1) for i in range(min(10, len(query_words)))]
+        }
+        
         try:
-            # Create sparse vector for BM25 search
-            query_words = query.lower().split()
-            sparse_vector = {
-                "indices": list(range(min(20, len(query_words)))),
-                "values": [0.5 + (i * 0.1) for i in range(min(20, len(query_words)))]
-            }
-            
-            # Search Pinecone index
             results = self.index.query(
                 sparse_vector=sparse_vector,
-                top_k=top_k,
+                filter=filter_dict if filter_dict else None,
+                top_k=20,
+                include_metadata=True
+            )
+            return results.get('matches', [])
+        except Exception as e:
+            # Fallback to text search if filter fails
+            results = self.index.query(
+                sparse_vector=sparse_vector,
+                top_k=20,
                 include_metadata=True
             )
             
-            return results.get('matches', [])
+            # Filter results manually
+            filtered_matches = []
+            for match in results.get('matches', []):
+                metadata = match.get('metadata', {})
+                if (search_type == "filename" and identifier.lower() in metadata.get('filename', '').lower()) or \
+                   (search_type == "network_id" and identifier in str(metadata.get('network_id', ''))) or \
+                   (search_type == "reference_id" and identifier.lower() in metadata.get('reference_id', '').lower()) or \
+                   (search_type == "auto" and identifier.lower() in str(metadata).lower()):
+                    filtered_matches.append(match)
             
-        except Exception as e:
-            st.error(f"❌ Pinecone search error: {str(e)}")
+            return filtered_matches
+    
+    def organize_data_by_tabs(self, matches: List[Dict]) -> Dict[str, List[Dict]]:
+        """Organize retrieved data into report structure tabs"""
+        
+        organized_data = {tab: [] for tab in self.report_structure}
+        
+        for match in matches:
+            metadata = match.get('metadata', {})
+            tab_type = metadata.get('report_section', 'Overall Performance Summary')
+            
+            # Map data to appropriate tabs based on content
+            if 'screen' in str(metadata).lower() or 'device' in str(metadata).lower():
+                organized_data['Screen Details'].append(metadata)
+            elif 'daily' in str(metadata).lower() or 'date' in str(metadata).lower():
+                organized_data['Daily Summary'].append(metadata)
+            elif any(term in str(metadata).lower() for term in ['age', 'gender', 'demographic']):
+                organized_data['Overall Age and Gender'].append(metadata)
+            elif 'hour' in str(metadata).lower() or 'time' in str(metadata).lower():
+                organized_data['Overall Hourly'].append(metadata)
+            elif 'network' in str(metadata).lower():
+                organized_data['Network Summary'].append(metadata)
+            else:
+                organized_data['Overall Performance Summary'].append(metadata)
+        
+        return organized_data
+    
+    def create_tab_visualizations(self, tab_data: Dict[str, List[Dict]], tab_name: str) -> List[go.Figure]:
+        """Create visualizations specific to each tab"""
+        
+        if not tab_data or len(tab_data) == 0:
             return []
-    
-    def analyze_sentiment(self, text: str) -> Dict:
-        """Analyze sentiment of the query"""
-        try:
-            blob = TextBlob(text)
-            polarity = blob.sentiment.polarity
-            subjectivity = blob.sentiment.subjectivity
-            
-            # Emotional classification
-            if polarity > 0.5:
-                emotion = "🎉 Very Positive"
-                color = "#00FF00"
-            elif polarity > 0.1:
-                emotion = "😊 Positive"
-                color = "#90EE90"
-            elif polarity > -0.1:
-                emotion = "😐 Neutral"
-                color = "#FFFF00"
-            elif polarity > -0.5:
-                emotion = "😔 Negative"
-                color = "#FFA500"
-            else:
-                emotion = "💔 Very Negative"
-                color = "#FF0000"
-                
-            return {
-                "polarity": polarity,
-                "subjectivity": subjectivity,
-                "emotion": emotion,
-                "color": color,
-                "confidence": abs(polarity) * 100
-            }
-        except:
-            return {"emotion": "😐 Neutral", "confidence": 50}
-    
-    def is_jad_vision_query(self, query: str) -> bool:
-        """Check if query is about JAD Vision Dell campaign"""
-        query_lower = query.lower()
-        # Updated indicators based on the provided data for March 4-10, 2024
-        jad_indicators = ["jad vision", "march 4", "march 10", "campaign"]
-        return any(indicator in query_lower for indicator in jad_indicators)
-    
-    def parse_jad_vision_query(self, query: str) -> str:
-        """Parse JAD Vision query to determine information type"""
-        query_lower = query.lower()
         
-        if any(word in query_lower for word in ["report info", "campaign details", "duration", "dates", "report structure", "generated on", "reviewed on", "validated on"]):
-            return "report_info"
-        elif any(word in query_lower for word in ["performance", "impressions", "reach", "frequency", "overall performance summary"]):
-            return "performance"
-        elif any(word in query_lower for word in ["age", "gender", "demographic", "overall age and gender"]):
-            return "demographics"
-        elif any(word in query_lower for word in ["hourly", "time", "hour", "when", "overall hourly"]):
-            return "hourly"
-        elif any(word in query_lower for word in ["screen", "network", "location", "screen details", "total referenceid"]):
-            return "screens"
-        elif any(word in query_lower for word in ["network id", "ids"]):
-            return "network_ids"
-        elif any(word in query_lower for word in ["glossary", "definition", "meaning", "notes", "glossary & note"]):
-            return "glossary"
-        else:
-            return "general"
-    
-    def get_jad_vision_report_info(self) -> str:
-        """Get JAD Vision Dell campaign report information"""
-        info = self.report_data["report_info"]
-        
-        # Safely access nested dictionary values
-        campaign_name = info.get("Campaign_Duration", {}).get("Campaign_Name", "JAD Vision Campaign")
-        start_date = info.get("Campaign_Duration", {}).get("Start", "N/A")
-        end_date = info.get("Campaign_Duration", {}).get("End", "N/A")
-        
-        # Calculate duration if dates are available and valid
-        duration_str = "N/A"
-        try:
-            if start_date != "N/A" and end_date != "N/A":
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-                duration_days = (end_dt - start_dt).days + 1 # Include both start and end day
-                duration_str = f"{duration_days} days"
-        except ValueError:
-            pass # Keep duration_str as N/A if date parsing fails
-
-        operating_hours_march4_8 = info.get("Campaign_Duration", {}).get("Operating_Hours", {}).get("March 4-8", "N/A")
-        operating_hours_march9_10 = info.get("Campaign_Duration", {}).get("Operating_Hours", {}).get("March 9-10", "N/A")
-        
-        spot_duration = info.get("Spot_Duration", "N/A")
-        
-        generated_on = info.get("Report_Generation", {}).get("Generated_On", "N/A")
-        reviewed_on = info.get("Report_Generation", {}).get("Reviewed_On", "N/A")
-        validated_on = info.get("Report_Generation", {}).get("Validated_On", "N/A")
-
-        report_structure = "\n".join([f"• {item}" for item in info.get("Report_Structure", [])])
-        
-        details = f"""
-        📊 **{campaign_name} Report**
-        
-        **📅 Campaign Period:**
-        • Start Date: {start_date}
-        • End Date: {end_date}
-        • Duration: {duration_str}
-        • Operating Hours (March 4-8): {operating_hours_march4_8}
-        • Operating Hours (March 9-10): {operating_hours_march9_10}
-        
-        **⚙️ Technical Details:**
-        • Spot Duration: {spot_duration}
-        
-        **📋 Report Timeline:**
-        • Generated: {generated_on}
-        • Reviewed: {reviewed_on} 
-        • Validated: {validated_on}
-        
-        **📝 Report Structure:**
-        {report_structure}
-        """
-        return details
-    
-    def get_jad_vision_performance(self) -> Tuple[str, go.Figure]:
-        """Get JAD Vision performance summary with visualization"""
-        performance = self.report_data["performance_summary"]
-        
-        # Calculate totals
-        total_impressions = sum(data["Impressions"] for data in performance.values())
-        total_reach = sum(data["Reach"] for data in performance.values())
-        
-        # Calculate average frequency carefully to avoid division by zero
-        frequencies = [data["Frequency"] for data in performance.values() if data["Frequency"] is not None]
-        avg_frequency = np.mean(frequencies) if frequencies else 0.0
-        
-        # Find top performers
-        top_location = max(performance.items(), key=lambda x: x[1]["Impressions"])
-        
-        summary = f"""
-        📈 **JAD Vision Campaign Performance Summary**
-        
-        **🎯 Campaign Totals (March 4 - March 10, 2024):**
-        • Total Impressions: {total_impressions:,}
-        • Total Unique Reach: {total_reach:,}
-        • Average Frequency: {avg_frequency:.2f}
-        
-        **🏆 Top Performing Location:**
-        • **{top_location[0]}**: {top_location[1]['Impressions']:,} impressions
-        
-        **📊 Location Breakdown:**
-        """
-        
-        # Add performance breakdown
-        sorted_performance = sorted(performance.items(), key=lambda x: x[1]["Impressions"], reverse=True)
-        for i, (location, data) in enumerate(sorted_performance, 1):
-            summary += f"\n{i}. **{location}**: {data['Impressions']:,} impressions | {data['Reach']:,} reach | {data['Frequency']:.2f} frequency"
-        
-        # Create visualization
-        locations = list(performance.keys())
-        impressions = [performance[loc]["Impressions"] for loc in locations]
-        reach = [performance[loc]["Reach"] for loc in locations]
-        frequency = [performance[loc]["Frequency"] for loc in locations]
-        
-        # Create subplot with multiple charts
-        fig = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=('📊 Impressions by Location', '🎯 Reach vs Impressions', 
-                           '🔄 Frequency Analysis', '💡 Performance Matrix'),
-            specs=[[{"type": "bar"}, {"type": "scatter"}],
-                   [{"type": "bar"}, {"type": "scatter"}]]
-        )
-        
-        # Impressions bar chart
-        fig.add_trace(go.Bar(x=locations, y=impressions, name="Impressions", 
-                            marker_color='#3498db'), row=1, col=1)
-        
-        # Reach vs Impressions scatter
-        fig.add_trace(go.Scatter(x=impressions, y=reach, mode='markers+text',
-                                text=[loc.split()[0] for loc in locations],
-                                name="Reach vs Impressions", 
-                                marker=dict(size=12, color='#e74c3c')), row=1, col=2)
-        
-        # Frequency bar chart
-        fig.add_trace(go.Bar(x=locations, y=frequency, name="Frequency", 
-                            marker_color='#2ecc71'), row=2, col=1)
-        
-        # Performance efficiency (Reach/Impressions ratio)
-        efficiency = []
-        for r, i in zip(reach, impressions):
-            if i > 0: # Avoid division by zero
-                efficiency.append(r/i*100)
-            else:
-                efficiency.append(0) # Or another suitable default value
-        
-        fig.add_trace(go.Scatter(x=frequency, y=efficiency, mode='markers+text',
-                                text=[loc.split()[0] for loc in locations],
-                                name="Efficiency %", 
-                                marker=dict(size=[i/5000 for i in impressions], color='#9b59b6')), row=2, col=2)
-        
-        fig.update_layout(height=800, title_text="📊 JAD Vision Campaign - Performance Dashboard")
-        fig.update_xaxes(tickangle=45)
-        
-        return summary, fig
-    
-    def get_jad_vision_demographics(self) -> Tuple[str, List[go.Figure]]:
-        """Get demographic analysis with charts"""
-        demographics = self.report_data["age_gender_summary"]
-        
-        # Calculate totals
-        total_impressions = sum(demographics["Age"][age]["Impressions"] for age in demographics["Age"])
-        
-        summary = f"""
-        👥 **JAD Vision Demographics Analysis**
-        
-        **📊 Age Distribution (Total: {total_impressions:,} impressions):**
-        """
-        
-        # Age breakdown
-        for age_group, data in demographics["Age"].items():
-            summary += f"\n• **{age_group} years**: {data['Percentage']:.1f}% ({data['Impressions']:,} impressions)"
-        
-        summary += f"""
-        
-        **⚖️ Gender Distribution:**
-        • **Male**: {demographics['Gender']['Male']['Percentage']:.1f}% ({demographics['Gender']['Male']['Impressions']:,} impressions)
-        • **Female**: {demographics['Gender']['Female']['Percentage']:.1f}% ({demographics['Gender']['Female']['Impressions']:,} impressions)
-        
-        **🎯 Key Insights:**
-        • Primary audience: 40-49 years (22.5% of total impressions)
-        • Male-skewed audience (59.6% male vs 40.4% female)
-        """
-        
-        # Create visualizations
         charts = []
+        df = pd.DataFrame(tab_data)
         
-        # Age distribution pie chart
-        age_labels = list(demographics["Age"].keys())
-        age_values = [demographics["Age"][age]["Impressions"] for age in age_labels]
+        if tab_name == "Screen Details":
+            # Screen/Device performance charts
+            if 'device_type' in df.columns and 'impressions' in df.columns:
+                fig = px.pie(df, values='impressions', names='device_type', 
+                           title='📱 Impressions by Device Type')
+                charts.append(fig)
+            
+            if 'screen_size' in df.columns and 'ctr' in df.columns:
+                fig = px.bar(df, x='screen_size', y='ctr', 
+                           title='📺 CTR by Screen Size')
+                charts.append(fig)
         
-        fig1 = px.pie(values=age_values, names=age_labels,
-                     title="📊 JAD Vision Campaign - Age Distribution",
-                     color_discrete_sequence=px.colors.qualitative.Set3)
-        fig1.update_traces(textposition='inside', textinfo='percent+label')
-        charts.append(fig1)
+        elif tab_name == "Overall Performance Summary":
+            # General performance metrics
+            if 'impressions' in df.columns and 'clicks' in df.columns:
+                fig = px.scatter(df, x='impressions', y='clicks', 
+                               title='👁️ Impressions vs Clicks Performance')
+                charts.append(fig)
+            
+            if 'spend' in df.columns and 'revenue' in df.columns:
+                fig = px.bar(df, x=df.index, y=['spend', 'revenue'], 
+                           title='💰 Spend vs Revenue Comparison')
+                charts.append(fig)
         
-        # Gender comparison
-        gender_data = demographics["Gender"]
-        fig2 = px.bar(
-            x=list(gender_data.keys()),
-            y=[gender_data[gender]["Impressions"] for gender in gender_data],
-            title="👥 Gender Reach Distribution",
-            color=list(gender_data.keys()),
-            color_discrete_map={"Male": "#3498db", "Female": "#e91e63"}
-        )
-        fig2.update_layout(showlegend=False)
-        charts.append(fig2)
+        elif tab_name == "Daily Summary":
+            # Time-based analysis
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                if 'impressions' in df.columns:
+                    fig = px.line(df, x='date', y='impressions', 
+                                title='📈 Daily Impressions Trend')
+                    charts.append(fig)
+                
+                if 'ctr' in df.columns:
+                    fig = px.line(df, x='date', y='ctr', 
+                                title='📊 Daily CTR Trend')
+                    charts.append(fig)
         
-        # Age vs Gender heatmap style chart
-        age_percentages = [demographics["Age"][age]["Percentage"] for age in age_labels]
+        elif tab_name == "Overall Age and Gender":
+            # Demographic analysis
+            if 'age_group' in df.columns and 'impressions' in df.columns:
+                fig = px.bar(df, x='age_group', y='impressions', 
+                           title='👥 Impressions by Age Group')
+                charts.append(fig)
+            
+            if 'gender' in df.columns and 'ctr' in df.columns:
+                fig = px.box(df, x='gender', y='ctr', 
+                           title='⚧️ CTR Distribution by Gender')
+                charts.append(fig)
         
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(name='Age Distribution %', x=age_labels, y=age_percentages, 
-                             marker_color='lightblue', yaxis='y1'))
+        elif tab_name == "Overall Hourly":
+            # Hourly performance
+            if 'hour' in df.columns and 'impressions' in df.columns:
+                fig = px.line(df, x='hour', y='impressions', 
+                            title='🕐 Hourly Impressions Pattern')
+                charts.append(fig)
+            
+            if 'hour' in df.columns and 'ctr' in df.columns:
+                fig = px.heatmap(df.pivot_table(values='ctr', index='hour', aggfunc='mean'), 
+                               title='🔥 Hourly CTR Heatmap')
+                charts.append(fig)
         
-        fig3.update_layout(
-            title="📈 Demographic Overview - Age Distribution",
-            xaxis_title="Age Groups",
-            yaxis_title="Percentage (%)",
-            template="plotly_white"
-        )
-        charts.append(fig3)
+        elif tab_name == "Network Summary":
+            # Network performance
+            if 'network_name' in df.columns and 'revenue' in df.columns:
+                fig = px.treemap(df, path=['network_name'], values='revenue',
+                               title='🌐 Revenue by Network')
+                charts.append(fig)
+            
+            if 'network_id' in df.columns and 'cpm' in df.columns:
+                fig = px.bar(df, x='network_id', y='cpm', 
+                           title='💳 CPM by Network ID')
+                charts.append(fig)
         
-        return summary, charts
+        return charts
     
-    def get_jad_vision_hourly(self) -> Tuple[str, go.Figure]:
-        """Get hourly performance analysis"""
-        hourly = self.report_data["hourly_summary"]
+    def generate_tab_summary(self, tab_data: List[Dict], tab_name: str) -> str:
+        """Generate summary for each tab"""
         
-        # Find peak hours
-        peak_hour = max(hourly.items(), key=lambda x: x[1])
-        lowest_hour = min(hourly.items(), key=lambda x: x[1])
-        total_daily = sum(hourly.values())
+        if not tab_data:
+            return f"No data available for {tab_name}"
         
-        summary = f"""
-        🕐 **JAD Vision - Hourly Performance Analysis**
+        df = pd.DataFrame(tab_data)
+        summary = f"## 📊 {tab_name} Summary\n\n"
         
-        **⏰ Key Performance Hours:**
-        • **Peak Hour**: {peak_hour[0]} with {peak_hour[1]:,} impressions
-        • **Lowest Hour**: {lowest_hour[0]} with {lowest_hour[1]:,} impressions
-        • **Daily Total**: {total_daily:,} impressions (assuming this is a typical daily sum)
-        • **Hourly Average**: {total_daily/len(hourly):,.0f} impressions
+        # General metrics
+        summary += f"**Total Records:** {len(df)}\n\n"
         
-        **🚇 Traffic Patterns:**
-        • **Morning Rush**: 7:00-9:00 AM (Peak commuter traffic)
-        • **Evening Rush**: 6:00-8:00 PM (Return commute)
-        • **Business Hours**: 10:00 AM - 5:00 PM (Steady traffic)
-        • **Late Night**: 9:00 PM onwards (Declining traffic)
+        # Tab-specific summaries
+        if tab_name == "Screen Details":
+            if 'device_type' in df.columns:
+                device_counts = df['device_type'].value_counts()
+                summary += f"**Top Device Type:** {device_counts.index[0]} ({device_counts.iloc[0]} records)\n"
         
-        **💡 Optimization Insights:**
-        • Best visibility during morning commute (8:00 AM peak)
-        • Strong evening performance for brand recall
-        """
+        elif tab_name == "Overall Performance Summary":
+            if 'impressions' in df.columns:
+                total_impressions = df['impressions'].sum()
+                summary += f"**Total Impressions:** {total_impressions:,}\n"
+            if 'clicks' in df.columns:
+                total_clicks = df['clicks'].sum()
+                summary += f"**Total Clicks:** {total_clicks:,}\n"
+            if 'spend' in df.columns:
+                total_spend = df['spend'].sum()
+                summary += f"**Total Spend:** ${total_spend:,.2f}\n"
         
-        # Create hourly visualization
-        hours = list(hourly.keys())
-        impressions = list(hourly.values())
+        elif tab_name == "Daily Summary":
+            if 'date' in df.columns:
+                date_range = f"{df['date'].min()} to {df['date'].max()}"
+                summary += f"**Date Range:** {date_range}\n"
         
-        fig = go.Figure()
+        elif tab_name == "Network Summary":
+            if 'network_name' in df.columns:
+                unique_networks = df['network_name'].nunique()
+                summary += f"**Unique Networks:** {unique_networks}\n"
         
-        # Add area chart for better visual appeal
-        fig.add_trace(go.Scatter(
-            x=hours, y=impressions,
-            mode='lines+markers',
-            name='Hourly Impressions',
-            fill='tonexty',
-            line=dict(color='#3498db', width=3),
-            marker=dict(size=8, color='#e74c3c')
-        ))
+        # Add key metrics if available
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_columns) > 0:
+            summary += "\n**Key Metrics:**\n"
+            for col in numeric_columns[:5]:  # Show top 5 numeric columns
+                if col in df.columns and not df[col].isna().all():
+                    avg_val = df[col].mean()
+                    summary += f"- **Average {col.title()}:** {avg_val:.2f}\n"
         
-        # Highlight peak hours
-        fig.add_annotation(
-            x=peak_hour[0], y=peak_hour[1],
-            text=f"Peak: {peak_hour[1]:,}",
-            showarrow=True,
-            arrowhead=2,
-            bgcolor="yellow",
-            bordercolor="red",
-            font=dict(color="black", size=12)
-        )
-        
-        # Add rush hour zones (adjusting for available data)
-        # Assuming peak hours 7-9 AM and 6-8 PM are "rush hours" from the context
-        morning_rush_start_idx = hours.index("7:00 AM") if "7:00 AM" in hours else None
-        morning_rush_end_idx = hours.index("9:00 AM") if "9:00 AM" in hours else None
+        return summary
 
-        evening_rush_start_idx = hours.index("6:00 PM") if "6:00 PM" in hours else None
-        evening_rush_end_idx = hours.index("8:00 PM") if "8:00 PM" in hours else None
-        
-        if morning_rush_start_idx is not None and morning_rush_end_idx is not None:
-            fig.add_vrect(x0=hours[morning_rush_start_idx], x1=hours[morning_rush_end_idx],
-                         annotation_text="Morning Rush", annotation_position="top left",
-                         fillcolor="green", opacity=0.1, line_width=0)
-        
-        if evening_rush_start_idx is not None and evening_rush_end_idx is not None:
-            fig.add_vrect(x0=hours[evening_rush_start_idx], x1=hours[evening_rush_end_idx],
-                         annotation_text="Evening Rush", annotation_position="top right", 
-                         fillcolor="blue", opacity=0.1, line_width=0)
-        
-        fig.update_layout(
-            title="🕒 JAD Vision Campaign - Hourly Impression Patterns",
-            xaxis_title="Hour of Day",
-            yaxis_title="Impressions",
-            template="plotly_white",
-            height=500,
-            hovermode='x unified'
-        )
-        
-        fig.update_xaxes(tickangle=45)
-        
-        return summary, fig
+
+def create_file_interface():
+    """Create Streamlit interface for file-based search"""
     
-    def get_network_info(self) -> str:
-        """Get network and screen information"""
-        network_ids = self.report_data["network_ids"]
-        screen_details = self.report_data["screen_details"]
+    st.set_page_config(
+        page_title="📁 File-Based RAG System", 
+        page_icon="🔍",
+        layout="wide"
+    )
+    
+    # Custom CSS
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .search-container {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+    }
+    
+    .tab-content {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+    }
+    
+    .metric-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin: 0.5rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown('<h1 class="main-header">📁 File-Based RAG System</h1>', unsafe_allow_html=True)
+    st.markdown("### *Search by File Name, Network ID, or Reference ID*")
+    
+    # Initialize RAG system
+    if 'file_rag' not in st.session_state:
+        st.session_state.file_rag = FileBasedRAG()
+    
+    # Search interface
+    st.markdown('<div class="search-container">', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        search_query = st.text_input(
+            "🔍 Enter File Name, Network ID, or Reference ID:",
+            placeholder="e.g., campaign_data.csv, NETWORK_123, REF_456"
+        )
+    
+    with col2:
+        search_type = st.selectbox(
+            "Search Type:",
+            ["auto", "filename", "network_id", "reference_id"]
+        )
+    
+    with col3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_button = st.button("🔍 Search", type="primary")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Example searches
+    st.markdown("### 💡 Example Searches")
+    example_col1, example_col2, example_col3 = st.columns(3)
+    
+    with example_col1:
+        if st.button("📄 campaign_report.csv"):
+            st.session_state.example_query = "campaign_report.csv"
+            st.session_state.example_type = "filename"
+    
+    with example_col2:
+        if st.button("🌐 NETWORK_12345"):
+            st.session_state.example_query = "NETWORK_12345"
+            st.session_state.example_type = "network_id"
+    
+    with example_col3:
+        if st.button("🔗 REF_ABC123"):
+            st.session_state.example_query = "REF_ABC123"
+            st.session_state.example_type = "reference_id"
+    
+    # Use example if clicked
+    if hasattr(st.session_state, 'example_query'):
+        search_query = st.session_state.example_query
+        search_type = st.session_state.example_type
+        search_button = True
+        # Clear example
+        delattr(st.session_state, 'example_query')
+        delattr(st.session_state, 'example_type')
+    
+    # Process search
+    if search_button and search_query:
+        with st.spinner(f"🔍 Searching for {search_query}..."):
+            try:
+                # Search for matches
+                matches = st.session_state.file_rag.search_by_identifier(search_query, search_type)
+                
+                if matches:
+                    st.success(f"✅ Found {len(matches)} results for '{search_query}'")
+                    
+                    # Organize data by tabs
+                    organized_data = st.session_state.file_rag.organize_data_by_tabs(matches)
+                    
+                    # Display results in tabs
+                    tab_objects = st.tabs([f"📊 {tab}" for tab in st.session_state.file_rag.report_structure])
+                    
+                    for idx, (tab_name, tab_data) in enumerate(organized_data.items()):
+                        with tab_objects[idx]:
+                            if tab_data:
+                                # Tab summary
+                                summary = st.session_state.file_rag.generate_tab_summary(tab_data, tab_name)
+                                st.markdown(summary)
+                                
+                                # Create visualizations
+                                charts = st.session_state.file_rag.create_tab_visualizations(tab_data, tab_name)
+                                
+                                if charts:
+                                    st.subheader("📈 Visualizations")
+                                    for chart in charts:
+                                        st.plotly_chart(chart, use_container_width=True)
+                                
+                                # Data table
+                                st.subheader("📋 Detailed Data")
+                                df = pd.DataFrame(tab_data)
+                                if not df.empty:
+                                    # Show key columns first
+                                    key_columns = ['filename', 'network_id', 'reference_id', 'date', 'impressions', 'clicks', 'spend', 'revenue']
+                                    available_key_columns = [col for col in key_columns if col in df.columns]
+                                    remaining_columns = [col for col in df.columns if col not in available_key_columns]
+                                    
+                                    display_columns = available_key_columns + remaining_columns
+                                    st.dataframe(df[display_columns], use_container_width=True)
+                                else:
+                                    st.info(f"No data available in {tab_name}")
+                            else:
+                                st.info(f"No data found for {tab_name}")
+                    
+                    # Overall metrics
+                    st.markdown("---")
+                    st.subheader("📊 Overall Metrics")
+                    
+                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                    
+                    all_data = []
+                    for tab_data in organized_data.values():
+                        all_data.extend(tab_data)
+                    
+                    if all_data:
+                        df_all = pd.DataFrame(all_data)
+                        
+                        with metric_col1:
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <h3>{len(matches)}</h3>
+                                <p>Total Records</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with metric_col2:
+                            unique_files = df_all['filename'].nunique() if 'filename' in df_all.columns else 0
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <h3>{unique_files}</h3>
+                                <p>Unique Files</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with metric_col3:
+                            unique_networks = df_all['network_id'].nunique() if 'network_id' in df_all.columns else 0
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <h3>{unique_networks}</h3>
+                                <p>Networks</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with metric_col4:
+                            total_impressions = df_all['impressions'].sum() if 'impressions' in df_all.columns else 0
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <h3>{total_impressions:,.0f}</h3>
+                                <p>Total Impressions</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                else:
+                    st.warning(f"❌ No results found for '{search_query}' with search type '{search_type}'")
+                    st.info("💡 Try different search terms or change the search type")
+                    
+            except Exception as e:
+                st.error(f"❌ Error occurred during search: {str(e)}")
+                st.info("🔧 Please check your search query and try again")
+    
+    # Sidebar with information
+    st.sidebar.markdown("### 📋 Report Structure")
+    for i, tab in enumerate(st.session_state.file_rag.report_structure, 1):
+        st.sidebar.markdown(f"{i}. **{tab}**")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔍 Search Types")
+    st.sidebar.markdown("""
+    - **Auto**: Automatically detect search type
+    - **Filename**: Search by file name (e.g., report.csv)  
+    - **Network ID**: Search by network identifier
+    - **Reference ID**: Search by reference identifier
+    """)
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 💡 Tips")
+    st.sidebar.markdown("""
+    - Use exact file names for best results
+    - Network IDs are usually alphanumeric
+    - Reference IDs can contain letters and numbers
+    - Try different search types if no results found
+    """)
+    
+    # Database status
+    st.sidebar.markdown("---")
+    st.sidebar.header("🗄️ Database Status")
+    try:
+        stats = st.session_state.file_rag.index.describe_index_stats()
+        st.sidebar.metric("Total Records", f"{stats.total_vector_count:,}")
+        st.sidebar.metric("Database Fullness", f"{stats.index_fullness:.1%}")
         
-        # Get overall performance summary to list impressions per screen
-        performance_summary = self.report_data["performance_summary"]
-        
-        info = f"""
-        🌐 **JAD Vision Network Information**
-        
-        **📺 Screen Network Details:**
-        • **Network ID**: {screen_details['Network_ID']}
-        • **Screen Name**: {screen_details['Screen_Name']}
-        • **Impressions**: {screen_details['Impressions']}
-        • **Reach**: {screen_details['Reach']}
-        • **Frequency**: {screen_details['Frequency']}
-        
-        **🆔 Network IDs ({len(network_ids)} screens):**
-        """
-        
-        # Display network IDs and their performance
-        for i, network_id in enumerate(network_ids, 1):
-            # Try to find the screen name corresponding to the network_id
-            screen_name = "Unknown Location"
-            for name, data in performance_summary.items():
-                # This requires a mapping between network_id and screen name if not directly available
-                # For now, we'll just use the network_id and try to get performance data
-                if name.replace(" ", "") in network_id.replace(" ", ""): # Simple heuristic
-                    screen_name = name
-                    break
+        if stats.index_fullness > 0.8:
+            st.sidebar.success("✅ Database is well populated!")
+        elif stats.index_fullness > 0.5:
+            st.sidebar.info("ℹ️ Database is moderately populated")
+        else:
+            st.sidebar.warning("⚠️ Database needs more data")
             
-            perf_data = performance_summary.get(screen_name, {"Impressions": "N/A", "Reach": "N/A", "Frequency": "N/A"})
-            
-            info += f"\n{i}. **{network_id}** ({screen_name}): Impressions: {perf_data['Impressions']:,}, Reach: {perf_data['Reach']:,}, Frequency: {perf_data['Frequency']:.2f}"
-        
-        info += f"""
-        
-        **📍 Network Coverage:**
-        • Major train stations across Japan (as indicated by the specific station names)
-        • High-traffic commuter locations
-        • Premium digital screen placements
-        • Strategic visibility points for brand exposure
-        """
-        
+    except Exception as e:
+        st.sidebar.error("❌ Could not connect to database")
+
+if __name__ == "__main__":
+    create_file_interface()
