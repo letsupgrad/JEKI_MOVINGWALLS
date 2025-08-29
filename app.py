@@ -1,3 +1,47 @@
+Excellent catch! That error message is extremely helpful because it tells us the exact problem.
+
+**`"message":"Cannot query index with dense 'vector_type' with only sparse vector"`**
+
+### The Diagnosis
+
+This error means your Pinecone index named `"campaign"` was created as a **dense index**. A dense index is designed for semantic search and **requires a dense vector** (a list of floating-point numbers, like `[0.01, -0.45, ...]`) with every query.
+
+However, the current code is only creating and sending a `sparse_vector` (for keyword matching). You are essentially telling a librarian who organizes books by subject (semantic meaning) to find a book using only a list of keywords, without understanding the subject. The system rejects this as an invalid request.
+
+### The Solution
+
+The solution is to **create a dense vector from your search query** using an embedding model (like OpenAI's) and send it along with your sparse vector. This will not only fix the error but also upgrade your search to a powerful **hybrid search**, which combines the best of both keyword and semantic matching.
+
+Here are the steps and the corrected code:
+
+#### Step 1: Add your OpenAI API Key to Secrets
+
+Just like you did for Pinecone, you need to provide your OpenAI API key.
+
+1.  Open your `.streamlit/secrets.toml` file.
+2.  Add your OpenAI key. The file should now look like this:
+
+    ```toml
+    # .streamlit/secrets.toml
+
+    PINECONE_API_KEY = "pcsk_3wbxiS_..."
+    OPENAI_API_KEY = "sk-..." 
+    ```
+
+#### Step 2: Update the Python Code
+
+I will now provide the updated `JekiDataRAG` class and the full script. The key changes are:
+1.  Initialize the `openai` client.
+2.  In `search_by_identifier`, generate a dense vector from the query text.
+3.  Add the `vector=dense_vector` parameter to the `index.query()` call.
+
+---
+
+### Corrected and Complete Single-File Code (`app.py`)
+
+Replace the entire content of your `app.py` file with this code. It includes the hardcoded Pinecone key as you requested in the last step, but now correctly uses the OpenAI key from secrets.
+
+```python
 from pinecone import Pinecone
 import openai
 from pinecone_text.sparse import BM25Encoder
@@ -212,3 +256,5 @@ def create_jeki_interface():
 
 if __name__ == "__main__":
     create_jeki_interface()
+
+```
