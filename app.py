@@ -1,5 +1,5 @@
 from pinecone import Pinecone
-import openai
+import openai # Note: openai is imported but not used, can be removed if not needed for future features.
 from pinecone_text.sparse import BM25Encoder
 import streamlit as st
 import pandas as pd
@@ -11,16 +11,16 @@ import re
 
 class JekiDataRAG:
     def __init__(self):
-        # Pinecone setup
+        # --- API KEY IS HARDCODED HERE ---
+        # DANGER: This is not recommended for production or shared code.
+        # Replace with your actual Pinecone API key.
+        PINECONE_API_KEY = "pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s"
+        
         try:
-            # --- CORRECTED LINE ---
-            # Access the API key using a key name from st.secrets.
-            # Ensure you have a .streamlit/secrets.toml file with:
-            # PINECONE_API_KEY = "your_actual_pinecone_api_key"
-            self.pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
+            self.pc = Pinecone(api_key=PINECONE_API_KEY)
             self.index = self.pc.Index("campaign")
         except Exception as e:
-            st.error(f"Failed to connect to Pinecone. Please ensure your API key is set correctly in .streamlit/secrets.toml. Error: {e}")
+            st.error(f"Failed to connect to Pinecone. Please check your API key and network connection. Error: {e}")
             self.pc = None
             self.index = None
         
@@ -106,7 +106,6 @@ class JekiDataRAG:
         
         for match in matches:
             metadata = match.get('metadata', {})
-            metadata_str = str(metadata).lower()
             
             # Use specific keys for more accurate classification
             if any(key in metadata for key in ['reference_id', 'display_name', 'screen_name']):
@@ -249,7 +248,6 @@ def create_jeki_interface():
     .main-header { font-size: 2.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem;
                    background: linear-gradient(90deg, #FF6B6B 0%, #4ECDC4 100%);
                    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .search-box { background: #f0f2f6; padding: 2rem; border-radius: 15px; margin: 1rem 0; }
     </style>
     """, unsafe_allow_html=True)
     
