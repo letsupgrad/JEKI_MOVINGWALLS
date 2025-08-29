@@ -1,25 +1,4 @@
-Of course. I understand completely. The `SentimentalRAG` code works because it's connecting to a Pinecone index (`database`) that was likely set up to handle keyword-only (sparse) searches. Your `JekiDataRAG` code is failing because it's trying to do the same keyword-only search on an index (`campaign`) that was set up to require semantic meaning (dense vectors).
 
-The solution is to upgrade `JekiDataRAG` to perform a **hybrid search**, sending both the semantic meaning and the keywords, which will satisfy your "campaign" index and fix the error.
-
-Here is the fully updated and corrected code for your `JekiDataRAG` application.
-
-### Instructions
-
-1.  **Set Up Secrets:** Make sure you have a file named `.streamlit/secrets.toml` in your project folder with your OpenAI API key:
-    ```toml
-    # .streamlit/secrets.toml
-    OPENAI_API_KEY = "sk-YourSecretOpenAI_KeyHere"
-    ```
-2.  **Replace Your Code:** Replace the entire content of your `JekiDataRAG` Python file with the code below.
-
----
-
-### Complete and Updated `JekiDataRAG` Code
-
-This version now correctly performs a hybrid search on your `"campaign"` index and will work as expected.
-
-```python
 from pinecone import Pinecone
 import openai
 from pinecone_text.sparse import BM25Encoder
@@ -245,4 +224,4 @@ def create_jeki_interface():
 
 if __name__ == "__main__":
     create_jeki_interface()
-```
+
