@@ -19,29 +19,7 @@ def generate_sparse_vector_from_id(record_id: str, num_indices=5, max_index=1000
         values.append(round(value, 4))
     return {"indices": indices, "values": values}
 
-def check_if_file_exists_in_pinecone(index, filename):
-    """Check if vectors from this file already exist in Pinecone"""
-    try:
-        # Create a unique identifier based on filename
-        file_hash = hashlib.sha256(filename.encode('utf-8')).hexdigest()[:16]
-        
-        # Try to fetch a vector with this file's identifier
-        response = index.query(
-            id=file_hash,
-            top_k=1,
-            include_metadata=True
-        )
-        
-        # If we get results, check if any metadata indicates this file
-        for match in response.get('matches', []):
-            metadata = match.get('metadata', {})
-            if metadata.get('source_file') == filename:
-                return True
-        return False
-    except:
-        return False
-
-def upsert_records(index, tab_name, records, filename):
+def upsert_records(index, tab_name, records):
     vectors = []
     for record in records:
         if record is None:
@@ -49,27 +27,37 @@ def upsert_records(index, tab_name, records, filename):
         record_id = record.get("Reference ID") or record.get("Reference_Id") or record.get("id")
         if not record_id:
             record_id = hashlib.sha256(json.dumps(record, sort_keys=True).encode('utf-8')).hexdigest()
-        
         sanitized_metadata = {k.lower().replace(' ', '_'): v for k, v in record.items()}
-        # Add source file information to metadata
-        sanitized_metadata['source_file'] = filename
-        sanitized_metadata['tab_name'] = tab_name
-        
         sparse_vector = generate_sparse_vector_from_id(record_id)
         vectors.append({
             "id": record_id,
             "sparse_values": sparse_vector,
             "metadata": sanitized_metadata
         })
-    
     if vectors:
-        st.write(f"Upserting {len(vectors)} vectors for tab '{tab_name}' from '{filename}'...")
+        st.write(f"Upserting {len(vectors)} vectors for tab '{tab_name}'...")
         index.upsert(vectors=vectors)
-        st.write(f"Upsert complete for '{tab_name}' from '{filename}'.")
+        st.write(f"Upsert complete for '{tab_name}'.")
     else:
-        st.write(f"No data to upsert for tab '{tab_name}' from '{filename}'.")
+        st.write(f"No data to upsert for tab '{tab_name}'.")
 
-st.title("JSON File Manager - Upload and Pinecone Integration")
+def print_tab(title, data):
+    st.header(title)
+    if isinstance(data, list):
+        for i, entry in enumerate(data, start=1):
+            with st.expander(f"Entry {i}"):
+                if isinstance(entry, dict):
+                    for key, value in entry.items():
+                        st.write(f"**{key}**: {value}")
+                else:
+                    st.write(entry)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            st.write(f"**{key}**: {value}")
+    else:
+        st.write(data)
+
+st.title("Upload up to 10 JSON files and select which to view")
 
 uploaded_files = st.file_uploader(
     "Upload JSON files", type="json", accept_multiple_files=True
@@ -79,58 +67,33 @@ if uploaded_files:
     if len(uploaded_files) > 10:
         st.warning("Please upload no more than 10 files.")
     else:
-        st.subheader("Uploaded Files:")
-        
-        # Simply list the filenames
-        for i, file in enumerate(uploaded_files, 1):
-            st.write(f"{i}. **{file.name}** ({file.size / 1024:.1f} KB)")
-        
-        # Option to view file contents (collapsed by default)
-        show_details = st.expander("🔍 Click to view file contents (optional)")
-        
-        with show_details:
-            filenames = [file.name for file in uploaded_files]
-            selected_files = st.multiselect("Select file(s) to view details", options=filenames)
-            
-            file_map = {file.name: file for file in uploaded_files}
-            
-            for fname in selected_files:
-                file = file_map.get(fname)
-                if file:
-                    try:
-                        file.seek(0)
-                        json_data = json.load(file)
-                        st.subheader(f"Contents of {fname}")
-                        
-                        # Show summary instead of full content
-                        st.write(f"**Number of sections:** {len(json_data)}")
-                        st.write(f"**Section names:** {', '.join(json_data.keys())}")
-                        
-                        # Option to show full details
-                        if st.checkbox(f"Show full details for {fname}", key=f"details_{fname}"):
-                            for tab_name, tab_data in json_data.items():
-                                st.write(f"**{tab_name}:** {len(tab_data) if isinstance(tab_data, list) else 'Single entry'}")
-                                
-                    except Exception as e:
-                        st.error(f"Error reading {fname}: {e}")
+        filenames = [file.name for file in uploaded_files]
+        selected_files = st.multiselect("Select file(s) to view details", options=filenames)
 
-        # Pinecone upsert section
-        st.subheader("📤 Pinecone Integration")
-        
-        if st.checkbox("Upload to Pinecone"):
+        file_map = {file.name: file for file in uploaded_files}
+
+        for fname in selected_files:
+            file = file_map.get(fname)
+            if file:
+                try:
+                    file.seek(0)
+                    json_data = json.load(file)
+                    st.subheader(f"Contents of {fname}")
+                    for tab_name, tab_data in json_data.items():
+                        print_tab(tab_name, tab_data)
+                except Exception as e:
+                    st.error(f"Error reading {fname}: {e}")
+
+        # Optionally Pinecone upsert (ask user)
+        if st.checkbox("Upsert selected files to Pinecone"):
             api_key = st.text_input("Enter Pinecone API Key:", type="password")
             index_name = st.text_input("Enter Pinecone Index Name:", value="jeki")
-            
-            # Check for existing files
-            check_existing = st.checkbox("Check for existing files (recommended)", value=True)
-            
-            if st.button("Process Files"):
-                if not api_key:
-                    st.error("Please enter Pinecone API key.")
+
+            if st.button("Run Upsert"):
+                if not (api_key and selected_files):
+                    st.error("Please select files and enter API key.")
                 else:
                     pc = Pinecone(api_key=api_key)
-                    
-                    # Create index if it doesn't exist
                     if not pc.has_index(index_name):
                         pc.create_index(
                             name=index_name,
@@ -139,37 +102,14 @@ if uploaded_files:
                             spec=ServerlessSpec(cloud="aws", region="us-east-1")
                         )
                         st.write(f"Created index '{index_name}'.")
-                    
                     index = pc.Index(index_name)
-                    file_map = {file.name: file for file in uploaded_files}
-                    
-                    processed_count = 0
-                    skipped_count = 0
-                    
-                    for file in uploaded_files:
-                        fname = file.name
-                        
-                        # Check if file already exists in Pinecone
-                        if check_existing:
-                            if check_if_file_exists_in_pinecone(index, fname):
-                                st.warning(f"⚠️ File '{fname}' appears to already exist in Pinecone. Skipping...")
-                                skipped_count += 1
-                                continue
-                        
-                        try:
-                            file.seek(0)
-                            json_data = json.load(file)
-                            
-                            for tab_name, tab_data in json_data.items():
-                                if tab_data:
-                                    upsert_records(index, tab_name, tab_data, fname)
-                            
-                            processed_count += 1
-                            st.success(f"✅ Processed '{fname}'")
-                            
-                        except Exception as e:
-                            st.error(f"❌ Error processing '{fname}': {e}")
-                    
-                    st.success(f"🎉 Upload completed! Processed: {processed_count}, Skipped: {skipped_count}")
+                    for fname in selected_files:
+                        file = file_map.get(fname)
+                        file.seek(0)
+                        json_data = json.load(file)
+                        for tab_name, tab_data in json_data.items():
+                            if tab_data:
+                                upsert_records(index, tab_name, tab_data)
+                    st.success("Upsert completed!")
 else:
-    st.info("Please upload JSON files to start.")
+    st.info("Please upload JSON files to start viewing.")
