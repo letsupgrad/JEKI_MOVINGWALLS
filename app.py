@@ -8,6 +8,14 @@ import plotly.graph_objects as go
 from datetime import datetime
 import numpy as np
 
+# Try to import sentence transformers for embeddings
+try:
+    from sentence_transformers import SentenceTransformer
+    EMBEDDINGS_AVAILABLE = True
+except ImportError:
+    EMBEDDINGS_AVAILABLE = False
+    st.warning("⚠️ Install sentence-transformers for semantic search: pip install sentence-transformers")
+
 # Page configuration
 st.set_page_config(
     page_title="J-AD Vision Analytics Query",
@@ -24,18 +32,21 @@ st.sidebar.header("🔧 Configuration")
 
 # Pinecone configuration
 with st.sidebar.expander("Pinecone Settings", expanded=True):
-    st.markdown("**Get your API key from:** [Pinecone Dashboard](https://app.pinecone.io/) → API Keys")
+    st.markdown("**Using your Pinecone setup**")
     api_key = st.text_input(
         "Pinecone API Key", 
+        value="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s",
         type="password", 
-        placeholder="pc-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        help="Get this from https://app.pinecone.io/ → API Keys section"
+        help="Your API key is pre-filled"
     )
-    index_name = st.text_input("Index Name", value="campaign", help="Name of your Pinecone index")
+    index_name = st.text_input("Index Name", value="campaign", help="Your index name")
     environment = st.selectbox("Environment", ["us-east-1-aws", "us-west-1-aws", "eu-west-1-aws", "asia-southeast-1-aws"], index=0)
     
-    if not api_key:
-        st.warning("⚠️ Please enter your Pinecone API key above to connect")
+    # Add model info
+    st.info("🤖 Using multilingual-e5-large embeddings")
+    
+    if api_key:
+        st.success("🔑 API key configured")
 
 # Initialize Pinecone connection
 @st.cache_resource
@@ -47,49 +58,55 @@ def init_pinecone(api_key, environment):
         st.error(f"Failed to connect to Pinecone: {str(e)}")
         return None
 
+# Initialize embedding model
+@st.cache_resource
+def load_embedding_model():
+    if EMBEDDINGS_AVAILABLE:
+        try:
+            model = SentenceTransformer("intfloat/multilingual-e5-large")
+            return model
+        except Exception as e:
+            st.error(f"Failed to load embedding model: {str(e)}")
+            return None
+    return None
+
 # Query function
 def query_pinecone(pc, index_name, query_text, top_k=10):
     try:
         index = pc.Index(index_name)
         
-        # Try different query approaches
         st.info(f"🔍 Searching for: '{query_text}' in index '{index_name}'")
         
-        # Method 1: Try querying by ID if it matches your data structure
-        if "_JAD Vision" in query_text:
-            try:
-                # Try to fetch by ID first
-                fetch_result = index.fetch(ids=[query_text])
-                if fetch_result.vectors:
-                    st.success("✅ Found exact match by ID!")
-                    return fetch_result
-            except:
-                pass
+        # Load embedding model for semantic search
+        model = load_embedding_model()
         
-        # Method 2: Query with dummy vector (you may need actual embeddings)
-        results = index.query(
-            vector=[0.1] * 1536,  # Placeholder - adjust dimensions as needed
-            top_k=top_k,
-            include_metadata=True,
-            filter={"campaign": "Dell"} if "Dell" in query_text else None
-        )
-        
-        # Method 3: Try different vector dimension if first attempt fails
-        if not results.matches:
-            try:
-                results = index.query(
-                    vector=[0.1] * 768,  # Try different dimension
-                    top_k=top_k,
-                    include_metadata=True
-                )
-            except:
-                pass
+        if model:
+            # Generate embedding for the query
+            query_embedding = model.encode(query_text).tolist()
+            
+            # Perform semantic search
+            results = index.query(
+                vector=query_embedding,
+                top_k=top_k,
+                include_metadata=True
+            )
+            
+            st.success(f"✅ Using semantic search with multilingual-e5-large model")
+            
+        else:
+            # Fallback to basic search
+            st.warning("🔄 Using fallback search method")
+            results = index.query(
+                vector=[0.1] * 1024,  # multilingual-e5-large dimension
+                top_k=top_k,
+                include_metadata=True
+            )
         
         return results
         
     except Exception as e:
         st.error(f"Query failed: {str(e)}")
-        st.error("💡 Try checking your index name and ensure data was uploaded correctly")
+        st.error("💡 Check your connection and index configuration")
         return None
 
 # Main interface
@@ -211,6 +228,13 @@ else:
 
 # Footer with information
 st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔑 Quick Setup")
+st.sidebar.markdown("""
+**Step 1:** Get your API key from [Pinecone Dashboard](https://app.pinecone.io/)
+**Step 2:** Enter "campaign" as index name  
+**Step 3:** Search for "_JAD Vision 1st April -7th April Dell"
+""")
+
 st.sidebar.markdown("### 📝 About")
 st.sidebar.markdown("""
 This app allows you to:
