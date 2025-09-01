@@ -721,4 +721,316 @@ def handle_pinecone_operations_mode(json_data_all: Dict, selected_files: List[st
     st.subheader("☁️ Pinecone Vector Database Integration")
     
     pinecone_expander = st.expander("🔧 Pinecone Configuration", expanded=False)
-    with pinecone_exp
+    with pinecone_expander:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            api_key = st.text_input(
+                "🔑 Pinecone API Key:", 
+                type="password",
+                help="Enter your Pinecone API key from the Pinecone console"
+            )
+        
+        with col2:
+            index_name = st.text_input(
+                "📊 Index Name:", 
+                value="json-analyzer-index",
+                help="Name of the Pinecone index (will be created if it doesn't exist)"
+            )
+        
+        # Advanced settings
+        with st.expander("⚙️ Advanced Settings"):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                batch_size = st.number_input(
+                    "Batch Size:", 
+                    min_value=10, 
+                    max_value=1000, 
+                    value=100,
+                    help="Number of vectors to upload per batch"
+                )
+            
+            with col2:
+                dimension = st.number_input(
+                    "Vector Dimension:", 
+                    min_value=100, 
+                    max_value=2000, 
+                    value=1000,
+                    help="Dimension of the sparse vectors"
+                )
+            
+            with col3:
+                cloud_region = st.selectbox(
+                    "Cloud Region:",
+                    ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"],
+                    help="Pinecone cloud region for the index"
+                )
+    
+    if api_key and index_name:
+        # Test connection and show current stats
+        try:
+            pc = Pinecone(api_key=api_key)
+            
+            if pc.has_index(index_name):
+                index = pc.Index(index_name)
+                stats = get_enhanced_pinecone_stats(index)
+                
+                if stats:
+                    st.subheader("📊 Current Pinecone Index Statistics")
+                    
+                    # Enhanced metrics display
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric(
+                            "🔢 Total Vectors", 
+                            f"{stats.get('total_vector_count', 0):,}",
+                            help="Total number of vectors in the index"
+                        )
+                    with col2:
+                        fullness = stats.get('index_fullness', 0)
+                        st.metric(
+                            "📈 Index Fullness", 
+                            f"{fullness:.2%}",
+                            delta=f"{fullness:.2%}" if fullness > 0.8 else None,
+                            delta_color="inverse" if fullness > 0.9 else "normal"
+                        )
+                    with col3:
+                        st.metric(
+                            "📏 Dimension", 
+                            stats.get('dimension', 'N/A')
+                        )
+                    with col4:
+                        namespaces = stats.get('namespaces', {})
+                        st.metric(
+                            "📂 Namespaces", 
+                            len(namespaces)
+                        )
+                    
+                    # Namespace breakdown if available
+                    if namespaces and len(namespaces) > 1:
+                        with st.expander("📂 Namespace Breakdown"):
+                            namespace_df = pd.DataFrame([
+                                {"Namespace": k, "Vector Count": v.get('vector_count', 0)}
+                                for k, v in namespaces.items()
+                            ])
+                            st.dataframe(namespace_df, use_container_width=True)
+            else:
+                st.info(f"📝 Index '{index_name}' will be created automatically during upsert.")
+                
+        except Exception as e:
+            st.warning(f"⚠️ Could not connect to Pinecone: {e}")
+    
+    # Upsert operation
+    st.markdown("---")
+    st.subheader("🚀 Upload Data to Pinecone")
+    
+    if not (api_key and selected_files):
+        st.warning("⚠️ Please provide Pinecone API key and ensure files are selected to proceed with upload.")
+    else:
+        # Pre-upload summary
+        estimated_vectors = sum(
+            len(tab_data) if isinstance(tab_data, list) else 1
+            for file_data in json_data_all.values()
+            for tab_data in file_data.values()
+        )
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("📊 Estimated Vectors", f"{estimated_vectors:,}")
+        with col2:
+            st.metric("📁 Files to Process", len(selected_files))
+        with col3:
+            estimated_batches = (estimated_vectors + batch_size - 1) // batch_size
+            st.metric("📦 Estimated Batches", estimated_batches)
+        
+        # Upload options
+        col1, col2 = st.columns(2)
+        with col1:
+            overwrite_existing = st.checkbox(
+                "🔄 Overwrite existing vectors",
+                value=False,
+                help="If checked, existing vectors with same IDs will be overwritten"
+            )
+        
+        with col2:
+            dry_run = st.checkbox(
+                "🧪 Dry run (preview only)",
+                value=False,
+                help="If checked, will show what would be uploaded without actually uploading"
+            )
+        
+        # Upload button
+        upload_button = st.button(
+            "🚀 Start Upload to Pinecone" if not dry_run else "🧪 Preview Upload",
+            type="primary",
+            use_container_width=True
+        )
+        
+        if upload_button:
+            if dry_run:
+                st.info("🧪 **Dry Run Mode - Preview Only**")
+                
+                # Show preview of what would be uploaded
+                with st.expander("📋 Upload Preview", expanded=True):
+                    preview_count = 0
+                    for fname in selected_files:
+                        if fname in json_data_all:
+                            st.write(f"**📄 File: {fname}**")
+                            for tab_name, tab_data in json_data_all[fname].items():
+                                if isinstance(tab_data, list):
+                                    count = len(tab_data)
+                                    preview_count += count
+                                    st.write(f"  • Tab '{tab_name}': {count} records")
+                                elif isinstance(tab_data, dict):
+                                    preview_count += 1
+                                    st.write(f"  • Tab '{tab_name}': 1 record")
+                    
+                    st.success(f"✅ Preview complete. Would upload {preview_count} vectors total.")
+            else:
+                # Actual upload
+                try:
+                    pc = Pinecone(api_key=api_key)
+                    
+                    # Create index if it doesn't exist
+                    if not pc.has_index(index_name):
+                        with st.spinner(f"🔨 Creating index '{index_name}'..."):
+                            pc.create_index(
+                                name=index_name,
+                                dimension=dimension,
+                                metric="cosine",
+                                spec=ServerlessSpec(cloud="aws", region=cloud_region)
+                            )
+                        st.success(f"✅ Created new index '{index_name}'")
+                    
+                    index = pc.Index(index_name)
+                    
+                    # Upload progress tracking
+                    total_upserted = 0
+                    start_time = time.time()
+                    
+                    # Create progress containers
+                    progress_bar = st.progress(0)
+                    status_container = st.empty()
+                    
+                    total_files = len(selected_files)
+                    
+                    for file_idx, fname in enumerate(selected_files):
+                        if fname in json_data_all:
+                            status_container.info(f"🔄 Processing file {file_idx + 1}/{total_files}: {fname}")
+                            
+                            for tab_name, tab_data in json_data_all[fname].items():
+                                if tab_data:  # Only process non-empty data
+                                    if isinstance(tab_data, list):
+                                        count = upsert_records(index, f"{fname}_{tab_name}", tab_data, batch_size)
+                                        total_upserted += count
+                                    elif isinstance(tab_data, dict):
+                                        count = upsert_records(index, f"{fname}_{tab_name}", [tab_data], batch_size)
+                                        total_upserted += count
+                        
+                        # Update overall progress
+                        progress_bar.progress((file_idx + 1) / total_files)
+                    
+                    # Upload completion
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    
+                    progress_bar.progress(1.0)
+                    status_container.empty()
+                    
+                    st.success(f"""
+                    ✅ **Upload Completed Successfully!**
+                    - 📊 Total vectors uploaded: {total_upserted:,}
+                    - ⏱️ Duration: {duration:.2f} seconds
+                    - 🚀 Average rate: {total_upserted/duration:.1f} vectors/second
+                    """)
+                    
+                    # Show updated stats
+                    updated_stats = get_enhanced_pinecone_stats(index)
+                    if updated_stats:
+                        st.subheader("📊 Updated Pinecone Statistics")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric(
+                                "🔢 Total Vectors", 
+                                f"{updated_stats.get('total_vector_count', 0):,}",
+                                delta=f"+{total_upserted:,}"
+                            )
+                        with col2:
+                            fullness = updated_stats.get('index_fullness', 0)
+                            st.metric("📈 Index Fullness", f"{fullness:.2%}")
+                        with col3:
+                            st.metric("📏 Dimension", updated_stats.get('dimension', 'N/A'))
+                
+                except Exception as e:
+                    st.error(f"❌ Error during upload: {e}")
+                    st.exception(e)  # Show full traceback in debug mode
+
+def display_welcome_message():
+    """Display welcome message when no files are uploaded"""
+    st.info("👆 **Please upload JSON files to start analyzing your data**")
+    
+    # Feature overview
+    st.markdown("## 🌟 Features Available")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        ### 📁 File Analysis
+        - 📊 Interactive data visualization
+        - 📈 Automatic chart generation
+        - 📋 Smart data table display
+        - 📊 Statistical summaries
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 🔍 Reference Search  
+        - 🎯 Precise ID matching
+        - 📄 File location tracking
+        - 📊 Detailed record analysis
+        - 💡 Smart suggestions
+        """)
+    
+    with col3:
+        st.markdown("""
+        ### ☁️ Pinecone Integration
+        - 🚀 Vector database upload
+        - 📊 Real-time statistics
+        - 🔧 Advanced configuration
+        - 🧪 Dry run preview
+        """)
+    
+    # Usage tips
+    st.markdown("---")
+    st.markdown("## 💡 Usage Tips")
+    
+    with st.expander("📋 Supported File Formats", expanded=True):
+        st.markdown("""
+        - **JSON Files**: Standard JSON format with nested objects and arrays
+        - **Multiple Files**: Upload up to 15 files simultaneously
+        - **Large Datasets**: Automatic pagination for datasets > 1000 records
+        - **Reference IDs**: Supports various ID field names (Reference ID, id, Reference_Id, etc.)
+        """)
+    
+    with st.expander("🔍 Search Capabilities"):
+        st.markdown("""
+        - **Reference ID Search**: Find specific records across all files
+        - **Smart Queries**: Use keywords like 'summary', 'performance' for category searches
+        - **Text Search**: Search within record values and field names
+        - **Case Insensitive**: All searches are case-insensitive for better usability
+        """)
+    
+    with st.expander("☁️ Pinecone Features"):
+        st.markdown("""
+        - **Automatic Index Creation**: Creates indexes if they don't exist
+        - **Batch Processing**: Efficient bulk uploads with progress tracking
+        - **Error Handling**: Robust error handling with detailed feedback
+        - **Statistics Dashboard**: Real-time index statistics and monitoring
+        """)
+
+# Run the application
+if __name__ == "__main__":
+    main()
