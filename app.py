@@ -11,13 +11,13 @@ def generate_sparse_vector_from_id(record_id: str, num_indices=5, max_index=1000
     for i in range(num_indices * 4):
         if len(seen_indices) >= num_indices:
             break
-        index = int(h[i*2: i*2+4], 16) % max_index
-        seen_indices.add(index)
+        idx = int(h[i*2: i*2+4], 16) % max_index
+        seen_indices.add(idx)
     indices = sorted(list(seen_indices))
     values = []
     for i in range(len(indices)):
-        value = 0.1 + (int(h[i*4: i*4+4], 16) % 900) / 1000.0
-        values.append(round(value,4))
+        val = 0.1 + (int(h[i*4: i*4+4], 16) % 900) / 1000.0
+        values.append(round(val, 4))
     return {"indices": indices, "values": values}
 
 def upsert_records(index, tab_name, records):
@@ -28,12 +28,12 @@ def upsert_records(index, tab_name, records):
         record_id = record.get("Reference ID") or record.get("Reference_Id") or record.get("id")
         if not record_id:
             record_id = hashlib.sha256(json.dumps(record, sort_keys=True).encode('utf-8')).hexdigest()
-        sanitized_metadata = {k.lower().replace(' ', '_'): v for k,v in record.items()}
+        metadata = {k.lower().replace(' ', '_'): v for k, v in record.items()}
         sparse_vector = generate_sparse_vector_from_id(record_id)
         vectors.append({
             "id": record_id,
             "sparse_values": sparse_vector,
-            "metadata": sanitized_metadata
+            "metadata": metadata
         })
     if vectors:
         index.upsert(vectors=vectors)
@@ -47,8 +47,8 @@ def print_tab(title, data):
         for i, entry in enumerate(data, 1):
             with st.expander(f"Entry {i}"):
                 if isinstance(entry, dict):
-                    for key,val in entry.items():
-                        st.write(f"**{key}**: {val}")
+                    for k,v in entry.items():
+                        st.write(f"**{k}**: {v}")
                 else:
                     st.write(entry)
     elif isinstance(data, dict):
@@ -57,32 +57,25 @@ def print_tab(title, data):
     else:
         st.write(data)
 
-st.title("Pinecone JSON Viewer & Upserter")
+st.title("Load JSON file by filename & Pinecone Upsert")
 
-JSON_DIR = "./json_files"  # Change as per your server
-
-filename = st.text_input("Enter JSON filename to load (must be in server directory):")
+filename = st.text_input("Enter JSON filename (with extension) available in working directory:")
 
 if filename:
-    filepath = os.path.join(JSON_DIR, filename)
-    if os.path.isfile(filepath):
+    if os.path.isfile(filename):
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filename, 'r', encoding='utf-8') as f:
                 json_data = json.load(f)
             st.success(f"Loaded '{filename}' successfully!")
-
-            # Display JSON content separated by tabs
             for tab_name, tab_data in json_data.items():
                 print_tab(tab_name, tab_data)
-
-            # Pinecone Upsert Section
-            with st.expander("Upsert JSON data into Pinecone"):
-                api_key = st.text_input("Pinecone API Key", type="password", key="pinecone_key")
-                index_name = st.text_input("Pinecone Index Name", value="jeki", key="pinecone_index")
-
-                if st.button("Upsert Data to Pinecone"):
+            
+            with st.expander("Pinecone Upsert Options"):
+                api_key = st.text_input("Pinecone API Key", type="password")
+                index_name = st.text_input("Pinecone Index Name", value="jeki")
+                if st.button("Upsert JSON data to Pinecone"):
                     if not api_key:
-                        st.error("Pinecone API key is required!")
+                        st.error("Please enter Pinecone API Key")
                     else:
                         pc = Pinecone(api_key=api_key)
                         if not pc.has_index(index_name):
@@ -92,20 +85,17 @@ if filename:
                                 metric="cosine",
                                 spec=ServerlessSpec(cloud="aws", region="us-east-1")
                             )
-                            st.info(f"Created Pinecone index '{index_name}'.")
+                            st.info(f"Created Pinecone index '{index_name}'")
                         index = pc.Index(index_name)
-
                         for tab_name, tab_data in json_data.items():
                             if tab_data:
                                 upsert_records(index, tab_name, tab_data)
                             else:
-                                st.warning(f"No data in tab '{tab_name}' for upsert")
-
-                        st.success("Upsert completed! Waiting index stabilization...")
+                                st.warning(f"No data in tab '{tab_name}' to upsert")
+                        st.success("Upsert completed! Waiting 5 seconds for indexing...")
                         time.sleep(5)
 
-                        # Show sample data fetched from Pinecone for verification
-                        sample_id = st.text_input("Enter Sample Record ID to fetch from Pinecone (optional)", key="sample_id")
+                        sample_id = st.text_input("Enter Sample Record ID to fetch from Pinecone (optional)")
                         if sample_id:
                             try:
                                 response = index.fetch(ids=[sample_id])
@@ -115,12 +105,11 @@ if filename:
                                 else:
                                     st.warning(f"Record ID '{sample_id}' not found in Pinecone.")
                             except Exception as e:
-                                st.error(f"Error fetching from Pinecone: {e}")
+                                st.error(f"Fetch error: {e}")
 
         except Exception as e:
-            st.error(f"Error loading JSON file: {e}")
+            st.error(f"Error reading JSON file: {e}")
     else:
-        st.error(f"File '{filename}' not found in directory '{JSON_DIR}'.")
+        st.error(f"File '{filename}' not found in current directory.")
 else:
     st.info("Please enter a JSON filename to load.")
-
