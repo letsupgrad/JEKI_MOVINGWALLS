@@ -1,48 +1,5 @@
 import streamlit as st
 import json
-import hashlib
-import time
-from pinecone import Pinecone, ServerlessSpec
-
-
-def generate_sparse_vector_from_id(record_id: str, num_indices=5, max_index=1000):
-    h = hashlib.sha256(record_id.encode('utf-8')).hexdigest()
-    seen_indices = set()
-    for i in range(num_indices * 4):
-        if len(seen_indices) >= num_indices:
-            break
-        index = int(h[i * 2: i * 2 + 4], 16) % max_index
-        seen_indices.add(index)
-    indices = sorted(list(seen_indices))
-    values = []
-    for i in range(len(indices)):
-        value = 0.1 + (int(h[i * 4: i * 4 + 4], 16) % 900) / 1000.0
-        values.append(round(value, 4))
-    return {"indices": indices, "values": values}
-
-
-def upsert_records(index, tab_name, records):
-    vectors = []
-    for record in records:
-        if record is None:
-            continue
-        record_id = record.get("Reference ID") or record.get("Reference_Id") or record.get("id")
-        if not record_id:
-            record_id = hashlib.sha256(json.dumps(record, sort_keys=True).encode('utf-8')).hexdigest()
-        sanitized_metadata = {k.lower().replace(' ', '_'): v for k, v in record.items()}
-        sparse_vector = generate_sparse_vector_from_id(record_id)
-        vectors.append({
-            "id": record_id,
-            "sparse_values": sparse_vector,
-            "metadata": sanitized_metadata
-        })
-    if vectors:
-        st.write(f"Upserting {len(vectors)} vectors for tab '{tab_name}'...")
-        index.upsert(vectors=vectors)
-        st.write(f"Upsert complete for '{tab_name}'.")
-    else:
-        st.write(f"No data to upsert for tab '{tab_name}'.")
-
 
 def print_tab(title, data):
     st.header(title)
@@ -60,55 +17,20 @@ def print_tab(title, data):
     else:
         st.write(data)
 
+st.title("JSON Viewer with File Uploader")
 
-st.title("Pinecone JSON Upsert & Viewer")
+uploaded_file = st.file_uploader("Upload a JSON file", type=["json"])
 
-json_file_name = st.text_input("Enter JSON filename to load (must exist on server):")
-
-if json_file_name:
+if uploaded_file is not None:
     try:
-        with open(json_file_name, 'r', encoding='utf-8') as f:
-            json_data = json.load(f)
-        st.success(f"Loaded '{json_file_name}' successfully!")
+        json_data = json.load(uploaded_file)
+        st.success("JSON loaded successfully!")
 
-        api_key = st.text_input("Enter Pinecone API Key:", type="password")
-        index_name = st.text_input("Enter Pinecone Index Name:", value="jeki")
+        # Print all tabs
+        for tab_name, tab_data in json_data.items():
+            print_tab(tab_name, tab_data)
 
-        if st.button("Upsert Data to Pinecone"):
-            if not (api_key and json_data):
-                st.error("API key and JSON data are required.")
-            else:
-                pc = Pinecone(api_key=api_key)
-                if not pc.has_index(index_name):
-                    pc.create_index(
-                        name=index_name,
-                        dimension=1000,
-                        metric="cosine",
-                        spec=ServerlessSpec(cloud="aws", region="us-east-1")
-                    )
-                    st.write(f"Created index '{index_name}'.")
-
-                index = pc.Index(index_name)
-
-                for tab_name, tab_data in json_data.items():
-                    if tab_data:
-                        upsert_records(index, tab_name, tab_data)
-                    else:
-                        st.write(f"No data for tab: {tab_name}")
-
-                st.success("Upsert finished! Waiting 5 seconds for indexing...")
-                time.sleep(5)
-
-        if st.checkbox("Show JSON Tabs and Data"):
-            for tab_name, tab_data in json_data.items():
-                print_tab(tab_name, tab_data)
-
-    except FileNotFoundError:
-        st.error(f"File '{json_file_name}' not found.")
-    except json.JSONDecodeError:
-        st.error(f"File '{json_file_name}' is not a valid JSON.")
     except Exception as e:
         st.error(f"Error loading JSON: {e}")
 else:
-    st.info("Please enter a JSON filename to load.")
-
+    st.info("Please upload a JSON file to display contents.")
