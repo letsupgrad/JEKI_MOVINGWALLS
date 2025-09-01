@@ -148,12 +148,23 @@ def create_visualizations(results, question):
                 data = json.loads(match.metadata['text'])
                 section = match.metadata.get('section', '')
                 
-                # Categorize data based on section
-                if '新宿' in section or '品川' in section or '東京' in section or '駅' in section:
+                # Better section detection and categorization
+                if any(keyword in section for keyword in ['新宿', '品川', '東京', '駅', '横浜', '池袋', '恵比寿', '上野', '秋葉原']):
                     # Station data
                     if isinstance(data, dict):
                         station_info = {
-                            'station': section.replace('J・ADビジョン　', ''),
+                            'station': section.replace('J・ADビジョン\u3000', '').replace('J・ADビジョン　', ''),
+                            'section': section,
+                            'data': data,
+                            'score': match.score
+                        }
+                        station_data.append(station_info)
+                
+                # Also check for English station indicators
+                elif 'Station' in section or 'station' in section.lower():
+                    if isinstance(data, dict):
+                        station_info = {
+                            'station': section,
                             'section': section,
                             'data': data,
                             'score': match.score
@@ -193,19 +204,69 @@ def create_visualizations(results, question):
             high_relevance = sum(1 for m in results.matches if m.score > 0.7)
             st.metric("High Relevance", high_relevance)
         
-        # Results table
+        # Results table with better formatting
         st.subheader("🔍 Detailed Results")
         results_df = []
         for i, match in enumerate(results.matches):
+            # Get better section name
+            section_name = match.metadata.get('section', 'Unknown Section')
+            if section_name and section_name != 'Unknown':
+                # Clean up section name
+                display_name = section_name.replace('J・ADビジョン\u3000', '').replace('J・ADビジョン　', '')
+            else:
+                display_name = f"Data Section {i+1}"
+            
+            # Get content preview
+            content_preview = ""
+            if match.metadata and 'text' in match.metadata:
+                text_content = match.metadata['text']
+                if len(text_content) > 200:
+                    content_preview = text_content[:200] + "..."
+                else:
+                    content_preview = text_content
+            
             results_df.append({
                 'Rank': i + 1,
-                'Section': match.metadata.get('section', 'Unknown'),
+                'Section': display_name,
                 'Relevance Score': f"{match.score:.3f}",
-                'Content Preview': match.metadata.get('text', '')[:100] + "..." if match.metadata.get('text', '') else "No content"
+                'Data Type': 'JSON Data' if '{' in content_preview else 'Text Data',
+                'Content Preview': content_preview if content_preview else "No preview available"
             })
         
         df = pd.DataFrame(results_df)
         st.dataframe(df, use_container_width=True)
+        
+        # Show actual section distribution
+        st.subheader("📊 Data Section Distribution")
+        section_counts = {}
+        for match in results.matches:
+            section = match.metadata.get('section', 'Unknown')
+            section_type = "Unknown"
+            
+            # Categorize sections
+            if any(station in section for station in ['新宿', '品川', '東京', '横浜', '池袋', '駅']):
+                section_type = "🏢 Station Data"
+            elif 'Daily' in section or '日別' in section or '2. Daily' in section:
+                section_type = "📅 Daily Performance"
+            elif 'Hourly' in section or '時間' in section or '4. Overall Hourly' in section:
+                section_type = "🕐 Hourly Analysis"
+            elif 'Age' in section or 'Gender' in section or '年齢' in section or '性別' in section or '3. Overall Age' in section:
+                section_type = "👥 Demographics"
+            elif 'performance' in section.lower() or 'summary' in section.lower() or '1. Overall' in section:
+                section_type = "📈 Performance Summary"
+            elif 'Network' in section or 'ネット' in section or '5. Network' in section:
+                section_type = "🌐 Network Data"
+            
+            section_counts[section_type] = section_counts.get(section_type, 0) + 1
+        
+        # Create pie chart for section distribution
+        if section_counts:
+            fig_sections = px.pie(
+                values=list(section_counts.values()),
+                names=list(section_counts.keys()),
+                title="Data Sections Found in Results"
+            )
+            st.plotly_chart(fig_sections, use_container_width=True)
     
     with tab2:
         st.subheader("🏢 Station Performance")
@@ -368,14 +429,55 @@ if st.button("🔍 Get Analysis", type="primary") or (hasattr(st.session_state, 
                 # Create comprehensive analysis
                 create_visualizations(results, question)
                 
-                # Show raw insights
+                # Show raw insights with better formatting
                 with st.expander("🔍 Raw Data Insights", expanded=False):
-                    for i, match in enumerate(results.matches[:3]):
-                        st.subheader(f"Insight {i+1}: {match.metadata.get('section', 'Unknown')}")
-                        st.write(f"**Relevance:** {match.score:.3f}")
-                        if match.metadata and 'text' in match.metadata:
-                            content = match.metadata['text'][:500]
-                            st.text_area(f"Content Preview {i+1}", content, height=100)
+                    for i, match in enumerate(results.matches[:5]):
+                        # Get better section name
+                        section_name = match.metadata.get('section', f'Data Section {i+1}')
+                        display_name = section_name.replace('J・ADビジョン\u3000', '').replace('J・ADビジョン　', '')
+                        
+                        st.subheader(f"📊 Insight {i+1}: {display_name}")
+                        
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            st.metric("Relevance Score", f"{match.score:.3f}")
+                            st.write(f"**Section ID:** {match.id}")
+                        
+                        with col2:
+                            if match.metadata and 'text' in match.metadata:
+                                content = match.metadata['text']
+                                
+                                # Try to parse as JSON for better display
+                                try:
+                                    json_data = json.loads(content)
+                                    st.write("**📋 Structured Data:**")
+                                    
+                                    # Show key metrics if it's a dict
+                                    if isinstance(json_data, dict):
+                                        # Extract key-value pairs for display
+                                        key_metrics = {}
+                                        for key, value in list(json_data.items())[:10]:
+                                            if isinstance(value, (int, float, str)) and len(str(value)) < 50:
+                                                key_metrics[key] = value
+                                        
+                                        if key_metrics:
+                                            metrics_df = pd.DataFrame(list(key_metrics.items()), 
+                                                                    columns=['Metric', 'Value'])
+                                            st.dataframe(metrics_df, use_container_width=True)
+                                        
+                                        # Show full JSON in expander
+                                        with st.expander("View Full JSON Data"):
+                                            st.json(json_data)
+                                    else:
+                                        st.json(json_data)
+                                        
+                                except json.JSONDecodeError:
+                                    st.write("**📝 Text Content:**")
+                                    st.text_area(f"Content {i+1}", content[:500], height=100, key=f"raw_content_{i}")
+                            else:
+                                st.warning("No content available for this result")
+                        
+                        st.markdown("---")
             else:
                 st.error("❌ Unable to retrieve data. Please check your connection.")
 
