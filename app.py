@@ -57,9 +57,223 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>📊 J-AD Vision Campaign Analytics Dashboard</h1>
-    <p>Your Dell campaign data is ready! Ask any questions to get insights with tables, charts, and detailed analysis.</p>
+    <p>Your Dell campaign data is ready! Browse all available sections or ask questions to get insights with tables, charts, and detailed analysis.</p>
 </div>
 """, unsafe_allow_html=True)
+
+# Data catalog section
+st.header("📁 Available Data Sections")
+
+# Define available sections (from your JSON structure)
+available_sections = {
+    "📋 Report Information": ["Report Info", "Report Info - JPN"],
+    "📖 Glossary & Notes": ["Glossary & Note", "Glossary & Note - JPN"],
+    "🖥️ Screen Details": ["Screen Details"],
+    "📊 Performance Analytics": [
+        "1. Overall performance summary",
+        "2. Daily", 
+        "3. Overall Age and Gender",
+        "4. Overall Hourly",
+        "5. Network Summary"
+    ],
+    "🏢 Station Locations - Tokyo Central": [
+        "J・ADビジョン\u3000東京駅丸の内地下連絡通路",
+        "J・ADビジョン\u3000東京駅京葉通路", 
+        "J・ADビジョン\u3000東京駅新幹線北乗換口",
+        "J・ADビジョン\u3000東京駅新幹線南乗換口",
+        "J・ADビジョン\u3000有楽町駅中央改札口"
+    ],
+    "🏢 Station Locations - Shinjuku Area": [
+        "J・ADビジョン\u3000新宿駅東口",
+        "J・ADビジョン\u3000新宿駅南口", 
+        "J・ADビジョン\u3000新宿駅甲州街道改札"
+    ],
+    "🏢 Station Locations - Major Hubs": [
+        "J・ADビジョン\u3000品川駅中央改札内",
+        "J・ADビジョン\u3000横浜駅中央通路",
+        "J・ADビジョン\u3000横浜駅南改札内",
+        "J・ADビジョン\u3000JR横浜タワーアトリウム",
+        "J・ADビジョン\u3000池袋中央改札内"
+    ],
+    "🏢 Station Locations - Other Lines": [
+        "J・ADビジョン\u3000巣鴨駅改札外",
+        "J・ADビジョン\u3000五反田駅",
+        "J・ADビジョン\u3000高輪ゲートウェイ駅",
+        "J・ADビジョン\u3000秋葉原駅新電気街口",
+        "J・ADビジョン\u3000吉祥寺駅南北自由通路",
+        "J・ADビジョン\u3000浦和駅改札口",
+        "J・ADビジョン\u3000大宮駅中央改札",
+        "J・ADビジョン\u3000高田馬場駅スマイル・ステーションビジョン",
+        "J・ADビジョン\u3000桜木町駅",
+        "J・ADビジョン\u3000恵比寿駅西口",
+        "J・ADビジョン\u3000赤羽駅北改札",
+        "J・ADビジョン\u3000八王子駅自由通路南",
+        "J・ADビジョン\u3000上野駅公園改札内"
+    ]
+}
+
+# Create expandable sections for data catalog
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("🗂️ Browse Data Sections")
+    
+    for category, sections in available_sections.items():
+        with st.expander(f"{category} ({len(sections)} items)"):
+            for section in sections:
+                clean_name = section.replace("J・ADビジョン\u3000", "🚉 ")
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.write(f"• {clean_name}")
+                with col_b:
+                    if st.button("📊 View", key=f"view_{section}", help=f"Get detailed analysis of {section}"):
+                        st.session_state.selected_section = section
+
+with col2:
+    st.subheader("📊 Quick Stats")
+    
+    # Count totals
+    total_sections = sum(len(sections) for sections in available_sections.values())
+    station_count = sum(len(sections) for category, sections in available_sections.items() if "Station" in category)
+    
+    st.metric("📁 Total Sections", total_sections)
+    st.metric("🏢 Station Locations", station_count)
+    st.metric("📈 Analytics Reports", 5)
+    st.metric("📋 Info Sections", 4)
+
+# Handle section selection
+if hasattr(st.session_state, 'selected_section'):
+    st.success(f"🎯 Selected: {st.session_state.selected_section}")
+    
+    # Auto-populate search with selected section
+    if 'selected_section' in st.session_state:
+        selected_query = st.session_state.selected_section
+        st.info(f"💡 Searching for: '{selected_query}'")
+        
+        # Trigger search automatically
+        with st.spinner(f"🔍 Loading data for: {selected_query}..."):
+            # Use section-specific query for better results
+            results = get_section_specific_query(init_pinecone(), "campaign", selected_query)
+            
+            if results and results.matches:
+                st.success(f"✅ Found detailed data for {st.session_state.selected_section}")
+                
+                # Show specific section analysis
+                st.header(f"📊 Detailed Analysis: {st.session_state.selected_section}")
+                
+                # Get the best match (most relevant)
+                best_match = results.matches[0]
+                
+                if best_match.metadata and 'text' in best_match.metadata:
+                    try:
+                        section_data = json.loads(best_match.metadata['text'])
+                        
+                        # Display section-specific analysis
+                        col1, col2 = st.columns([2, 1])
+                        
+                        with col1:
+                            st.subheader("📋 Section Data")
+                            
+                            if isinstance(section_data, dict):
+                                # Create metrics from numerical data
+                                numerical_metrics = {}
+                                text_info = {}
+                                
+                                for key, value in section_data.items():
+                                    if isinstance(value, (int, float)) and value > 0:
+                                        numerical_metrics[key] = value
+                                    elif isinstance(value, str) and len(str(value)) < 100:
+                                        text_info[key] = value
+                                
+                                # Show key metrics
+                                if numerical_metrics:
+                                    st.write("**📊 Key Metrics:**")
+                                    metrics_cols = st.columns(min(3, len(numerical_metrics)))
+                                    for i, (metric, value) in enumerate(list(numerical_metrics.items())[:6]):
+                                        with metrics_cols[i % 3]:
+                                            st.metric(metric, f"{value:,}" if isinstance(value, (int, float)) else str(value))
+                                
+                                # Show text information
+                                if text_info:
+                                    st.write("**📝 Information:**")
+                                    info_df = pd.DataFrame(list(text_info.items()), columns=['Field', 'Value'])
+                                    st.dataframe(info_df, use_container_width=True)
+                                
+                                # Show complete data
+                                st.write("**🗂️ Complete Section Data:**")
+                                st.json(section_data)
+                                
+                            else:
+                                st.json(section_data)
+                        
+                        with col2:
+                            st.subheader("📈 Section Info")
+                            st.metric("Relevance Score", f"{best_match.score:.3f}")
+                            st.metric("Data Points", len(section_data) if isinstance(section_data, dict) else 1)
+                            
+                            # Section type classification
+                            section_type = "📊 Data Section"
+                            if "station" in selected_query.lower() or "駅" in selected_query:
+                                section_type = "🏢 Station Data"
+                            elif "overall" in selected_query.lower() or "summary" in selected_query.lower():
+                                section_type = "📈 Performance Summary"
+                            elif "daily" in selected_query.lower() or "日" in selected_query:
+                                section_type = "📅 Daily Analysis"
+                            elif "hourly" in selected_query.lower() or "時間" in selected_query:
+                                section_type = "🕐 Hourly Analysis"
+                            
+                            st.info(f"**Type:** {section_type}")
+                            
+                            # Related sections suggestion
+                            st.write("**💡 Related Sections:**")
+                            if "新宿" in selected_query:
+                                st.write("- 新宿駅南口")
+                                st.write("- 新宿駅甲州街道改札")
+                            elif "東京駅" in selected_query:
+                                st.write("- 東京駅京葉通路") 
+                                st.write("- 東京駅新幹線北乗換口")
+                            elif "overall" in selected_query.lower():
+                                st.write("- Daily performance")
+                                st.write("- Age and Gender")
+                                st.write("- Hourly analysis")
+                        
+                        # Create section-specific visualization
+                        if isinstance(section_data, dict) and numerical_metrics:
+                            st.subheader("📊 Data Visualization")
+                            
+                            # Create appropriate chart based on data
+                            if len(numerical_metrics) > 1:
+                                # Bar chart for multiple metrics
+                                metrics_df = pd.DataFrame(list(numerical_metrics.items()), columns=['Metric', 'Value'])
+                                fig = px.bar(metrics_df, x='Metric', y='Value', 
+                                           title=f'Metrics for {st.session_state.selected_section}')
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                    except json.JSONDecodeError:
+                        st.write("**📝 Raw Content:**")
+                        st.text_area("Section Content", best_match.metadata['text'], height=300)
+                
+                # Show all matches for comparison
+                if len(results.matches) > 1:
+                    st.subheader("🔍 Additional Related Data")
+                    for i, match in enumerate(results.matches[1:], 2):
+                        with st.expander(f"Related Data {i} (Score: {match.score:.3f})"):
+                            if match.metadata and 'text' in match.metadata:
+                                try:
+                                    additional_data = json.loads(match.metadata['text'])
+                                    st.json(additional_data)
+                                except:
+                                    st.text(match.metadata['text'][:500])
+                
+                create_visualizations(results, selected_query)
+            else:
+                st.warning(f"❌ No data found for {st.session_state.selected_section}")
+                st.info("💡 This section might not be available in the current dataset.")
+        
+        # Clear selection after use
+        if st.button("🔄 Clear Selection"):
+            del st.session_state.selected_section
+            st.rerun()
 
 # Initialize session state
 if 'data_loaded' not in st.session_state:
@@ -92,17 +306,40 @@ def init_pinecone():
         st.error(f"Failed to connect to Pinecone: {str(e)}")
         return None
 
-# Load embedding model
-@st.cache_resource
-def load_embedding_model():
-    if EMBEDDINGS_AVAILABLE:
-        try:
-            model = SentenceTransformer("intfloat/multilingual-e5-large")
-            return model
-        except Exception as e:
-            st.error(f"Failed to load embedding model: {str(e)}")
-            return None
-    return None
+# Add section-specific query function
+def get_section_specific_query(pc, index_name, section_name):
+    """Query for specific section by exact name match"""
+    try:
+        index = pc.Index(index_name)
+        
+        # First try to find by section metadata filter
+        model = load_embedding_model()
+        if model:
+            query_embedding = model.encode(section_name).tolist()
+            
+            # Query with high similarity threshold
+            results = index.query(
+                vector=query_embedding,
+                top_k=3,
+                include_metadata=True
+            )
+            
+            # Filter for exact or close section matches
+            filtered_matches = []
+            for match in results.matches:
+                if match.metadata and 'section' in match.metadata:
+                    if section_name in match.metadata['section'] or match.metadata['section'] in section_name:
+                        filtered_matches.append(match)
+            
+            if filtered_matches:
+                results.matches = filtered_matches
+                return results
+            else:
+                return results  # Return all if no exact match
+                
+    except Exception as e:
+        st.error(f"Section query failed: {str(e)}")
+        return None
 
 # Query function with natural language processing
 def query_campaign_data(question, top_k=5):
