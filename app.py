@@ -306,6 +306,18 @@ def init_pinecone():
         st.error(f"Failed to connect to Pinecone: {str(e)}")
         return None
 
+# Load embedding model
+@st.cache_resource
+def load_embedding_model():
+    if EMBEDDINGS_AVAILABLE:
+        try:
+            model = SentenceTransformer("intfloat/multilingual-e5-large")
+            return model
+        except Exception as e:
+            st.error(f"Failed to load embedding model: {str(e)}")
+            return None
+    return None
+
 # Add section-specific query function
 def get_section_specific_query(pc, index_name, section_name):
     """Query for specific section by exact name match"""
