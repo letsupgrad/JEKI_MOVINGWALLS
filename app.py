@@ -24,9 +24,18 @@ st.sidebar.header("🔧 Configuration")
 
 # Pinecone configuration
 with st.sidebar.expander("Pinecone Settings", expanded=True):
-    api_key = st.text_input("Pinecone API Key", type="password", help="Enter your Pinecone API key")
-    index_name = st.text_input("Index Name", value="jad-vision-analytics", help="Name of your Pinecone index")
+    st.markdown("**Get your API key from:** [Pinecone Dashboard](https://app.pinecone.io/) → API Keys")
+    api_key = st.text_input(
+        "Pinecone API Key", 
+        type="password", 
+        placeholder="pc-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        help="Get this from https://app.pinecone.io/ → API Keys section"
+    )
+    index_name = st.text_input("Index Name", value="campaign", help="Name of your Pinecone index")
     environment = st.selectbox("Environment", ["us-east-1-aws", "us-west-1-aws", "eu-west-1-aws", "asia-southeast-1-aws"], index=0)
+    
+    if not api_key:
+        st.warning("⚠️ Please enter your Pinecone API key above to connect")
 
 # Initialize Pinecone connection
 @st.cache_resource
@@ -42,16 +51,45 @@ def init_pinecone(api_key, environment):
 def query_pinecone(pc, index_name, query_text, top_k=10):
     try:
         index = pc.Index(index_name)
-        # For text-based querying, you might need to embed the query text
-        # This is a simplified version - you may need to adjust based on how you stored the data
+        
+        # Try different query approaches
+        st.info(f"🔍 Searching for: '{query_text}' in index '{index_name}'")
+        
+        # Method 1: Try querying by ID if it matches your data structure
+        if "_JAD Vision" in query_text:
+            try:
+                # Try to fetch by ID first
+                fetch_result = index.fetch(ids=[query_text])
+                if fetch_result.vectors:
+                    st.success("✅ Found exact match by ID!")
+                    return fetch_result
+            except:
+                pass
+        
+        # Method 2: Query with dummy vector (you may need actual embeddings)
         results = index.query(
-            vector=[0.1] * 1536,  # Placeholder vector - replace with actual embedding
+            vector=[0.1] * 1536,  # Placeholder - adjust dimensions as needed
             top_k=top_k,
-            include_metadata=True
+            include_metadata=True,
+            filter={"campaign": "Dell"} if "Dell" in query_text else None
         )
+        
+        # Method 3: Try different vector dimension if first attempt fails
+        if not results.matches:
+            try:
+                results = index.query(
+                    vector=[0.1] * 768,  # Try different dimension
+                    top_k=top_k,
+                    include_metadata=True
+                )
+            except:
+                pass
+        
         return results
+        
     except Exception as e:
         st.error(f"Query failed: {str(e)}")
+        st.error("💡 Try checking your index name and ensure data was uploaded correctly")
         return None
 
 # Main interface
