@@ -36,88 +36,80 @@ def upsert_records(index, tab_name, records):
         })
     if vectors:
         st.write(f"Upserting {len(vectors)} vectors for tab '{tab_name}'...")
-        index.upsert(vectors=vectors, namespace=tab_name)
-        st.success(f"Upsert complete for '{tab_name}'.")
+        index.upsert(vectors=vectors)
+        st.write(f"Upsert complete for '{tab_name}'.")
     else:
-        st.warning(f"No data to upsert for tab '{tab_name}'.")
+        st.write(f"No data to upsert for tab '{tab_name}'.")
 
-def print_tab(tab_name, data):
-    st.header(f"Tab: {tab_name}")
+def print_tab(title, data):
+    st.header(title)
     if isinstance(data, list):
         for i, entry in enumerate(data, start=1):
             with st.expander(f"Entry {i}"):
                 if isinstance(entry, dict):
                     for key, value in entry.items():
-                        st.write(f"**{key}:** {value}")
+                        st.write(f"**{key}**: {value}")
                 else:
                     st.write(entry)
     elif isinstance(data, dict):
         for key, value in data.items():
-            st.write(f"**{key}:** {value}")
+            st.write(f"**{key}**: {value}")
     else:
         st.write(data)
 
-def main():
-    st.title("Pinecone Sparse Vector Upsert & Query")
+st.title("Upload up to 10 JSON files and select which to view")
 
-    api_key = st.text_input("Pinecone API Key", type="password")
-    index_name = st.text_input("Pinecone Index Name", value="jeki")
-    pinecone_dim = st.number_input("Vector dimension", value=1000, step=1)
-    pinecone_region = st.text_input("Pinecone Region", value="us-east-1")
+uploaded_files = st.file_uploader(
+    "Upload JSON files", type="json", accept_multiple_files=True
+)
 
-    uploaded_file = st.file_uploader("Upload JSON file", type=["json"])
+if uploaded_files:
+    if len(uploaded_files) > 10:
+        st.warning("Please upload no more than 10 files.")
+    else:
+        filenames = [file.name for file in uploaded_files]
+        selected_files = st.multiselect("Select file(s) to view details", options=filenames)
 
-    if st.button("Initialize Pinecone and Upsert Data") and api_key and index_name and uploaded_file:
-        pc = Pinecone(api_key=api_key)
-        if not pc.has_index(index_name):
-            pc.create_index(
-                name=index_name,
-                dimension=pinecone_dim,
-                metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region=pinecone_region)
-            )
-            st.info(f"Created index '{index_name}'.")
-        index = pc.Index(index_name)
+        file_map = {file.name: file for file in uploaded_files}
 
-        try:
-            json_data = json.load(uploaded_file)
-        except Exception as e:
-            st.error(f"Error reading JSON: {e}")
-            return
+        for fname in selected_files:
+            file = file_map.get(fname)
+            if file:
+                try:
+                    file.seek(0)
+                    json_data = json.load(file)
+                    st.subheader(f"Contents of {fname}")
+                    for tab_name, tab_data in json_data.items():
+                        print_tab(tab_name, tab_data)
+                except Exception as e:
+                    st.error(f"Error reading {fname}: {e}")
 
-        for tab_name, tab_data in json_data.items():
-            if tab_data:
-                upsert_records(index, tab_name, tab_data)
-            else:
-                st.warning(f"No data for tab: {tab_name}")
+        # Optionally Pinecone upsert (ask user)
+        if st.checkbox("Upsert selected files to Pinecone"):
+            api_key = st.text_input("Enter Pinecone API Key:", type="password")
+            index_name = st.text_input("Enter Pinecone Index Name:", value="jeki")
 
-        st.info("Waiting for indexing to complete...")
-        time.sleep(5)
-        st.success("Upsert completed!")
-
-        st.session_state["index"] = index  # Store index object for later use
-        st.session_state["json_data"] = json_data
-
-    if "json_data" in st.session_state:
-        st.subheader("Tab Data Preview")
-        for tab_name, tab_data in st.session_state["json_data"].items():
-            print_tab(tab_name, tab_data)
-
-    st.subheader("Fetch Metadata by Record ID")
-    record_id = st.text_input("Enter Record ID to fetch")
-    if st.button("Fetch Record") and "index" in st.session_state and record_id:
-        index = st.session_state["index"]
-        try:
-            response = index.fetch(ids=[record_id])
-            if response.vectors and record_id in response.vectors:
-                metadata = response.vectors[record_id].metadata
-                st.write(f"Metadata for Record ID: {record_id}")
-                for k, v in metadata.items():
-                    st.write(f"**{k}:** {v}")
-            else:
-                st.warning(f"Record ID {record_id} not found.")
-        except Exception as e:
-            st.error(f"Error fetching record {record_id}: {e}")
-
-if __name__ == "__main__":
-    main()
+            if st.button("Run Upsert"):
+                if not (api_key and selected_files):
+                    st.error("Please select files and enter API key.")
+                else:
+                    pc = Pinecone(api_key=api_key)
+                    if not pc.has_index(index_name):
+                        pc.create_index(
+                            name=index_name,
+                            dimension=1000,
+                            metric="cosine",
+                            spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                        )
+                        st.write(f"Created index '{index_name}'.")
+                    index = pc.Index(index_name)
+                    for fname in selected_files:
+                        file = file_map.get(fname)
+                        file.seek(0)
+                        json_data = json.load(file)
+                        for tab_name, tab_data in json_data.items():
+                            if tab_data:
+                                upsert_records(index, tab_name, tab_data)
+                    st.success("Upsert completed!")
+else:
+    st.info("Please upload JSON files to start viewing.")
