@@ -22,7 +22,15 @@ except ImportError:
 def init_pinecone():
     """Initializes and returns the Pinecone client."""
     try:
-        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
+        # --- MODIFICATION: PASTE YOUR API KEY HERE ---
+        # WARNING: Do not share this code publicly with your key included.
+        PINECONE_API_KEY = "YOUR_PINECONE_API_KEY_HERE" 
+        
+        if PINECONE_API_KEY == "YOUR_PINECONE_API_KEY_HERE":
+            st.error("Please replace 'YOUR_PINECONE_API_KEY_HERE' with your actual Pinecone API key.")
+            return None
+            
+        pc = Pinecone(api_key=PINECONE_API_KEY)
         return pc
     except Exception as e:
         st.error(f"Failed to connect to Pinecone: {str(e)}")
