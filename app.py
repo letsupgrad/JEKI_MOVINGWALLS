@@ -24,7 +24,7 @@ def init_pinecone():
     try:
         # --- MODIFICATION: PASTE YOUR API KEY HERE ---
         # WARNING: Do not share this code publicly with your key included.
-        PINECONE_API_KEY = "YOUR_PINECONE_API_KEY_HERE" 
+        PINECONE_API_KEY = "pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s" 
         
         if PINECONE_API_KEY == "YOUR_PINECONE_API_KEY_HERE":
             st.error("Please replace 'YOUR_PINECONE_API_KEY_HERE' with your actual Pinecone API key.")
