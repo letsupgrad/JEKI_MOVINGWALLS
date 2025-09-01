@@ -1,12 +1,11 @@
 import streamlit as st
-import pinecone
-from pinecone import Pinecone, ServerlessSpec
 import pandas as pd
 import json
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import numpy as np
+from pinecone import Pinecone
 
 # Try to import sentence transformers for embeddings
 try:
@@ -14,51 +13,86 @@ try:
     EMBEDDINGS_AVAILABLE = True
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
-    st.warning("⚠️ Install sentence-transformers for semantic search: pip install sentence-transformers")
 
 # Page configuration
 st.set_page_config(
-    page_title="J-AD Vision Analytics Query",
+    page_title="J-AD Vision Analytics Dashboard",
     page_icon="📊",
     layout="wide"
 )
 
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(90deg, #1f4e79 0%, #2d5aa0 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .status-card {
+        background: #f0f8f0;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #28a745;
+    }
+    .metric-card {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .chat-message {
+        background: #e3f2fd;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Title and header
-st.title("📊 J-AD Vision Campaign Analytics")
-st.markdown("Query your Dell campaign data from Pinecone vector database")
+st.markdown("""
+<div class="main-header">
+    <h1>📊 J-AD Vision Campaign Analytics Dashboard</h1>
+    <p>Your Dell campaign data is ready! Ask any questions to get insights with tables, charts, and detailed analysis.</p>
+</div>
+""", unsafe_allow_html=True)
 
-# Sidebar for configuration
-st.sidebar.header("🔧 Configuration")
+# Initialize session state
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
-# Pinecone configuration
-with st.sidebar.expander("Pinecone Settings", expanded=True):
-    st.markdown("**Using your Pinecone setup**")
-    api_key = st.text_input(
-        "Pinecone API Key", 
-        value="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s",
-        type="password", 
-        help="Your API key is pre-filled"
-    )
-    index_name = st.text_input("Index Name", value="campaign", help="Your index name")
-    environment = st.selectbox("Environment", ["us-east-1-aws", "us-west-1-aws", "eu-west-1-aws", "asia-southeast-1-aws"], index=0)
-    
-    # Add model info
-    st.info("🤖 Using multilingual-e5-large embeddings")
-    
-    if api_key:
-        st.success("🔑 API key configured")
+# Sidebar configuration
+st.sidebar.header("🔧 System Status")
+
+# Connection status
+with st.sidebar.container():
+    st.markdown("""
+    <div class="status-card">
+        <h4>✅ Data Status</h4>
+        <p>📅 <strong>Campaign:</strong> Dell J-AD Vision<br>
+        📆 <strong>Period:</strong> April 1-7, 2024<br>
+        🏢 <strong>Stations:</strong> 25+ locations<br>
+        🔗 <strong>Database:</strong> Connected to Pinecone</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Initialize Pinecone connection
 @st.cache_resource
-def init_pinecone(api_key, environment):
+def init_pinecone():
     try:
-        pc = Pinecone(api_key=api_key)
+        pc = Pinecone(api_key="pcsk_3wbxiS_JFsW8uFyumkQ2oMD5FkfjKJPV5kYkiDwX1T15tg2HtFSn4ioZEeVpsSV6V1DK7s")
         return pc
     except Exception as e:
         st.error(f"Failed to connect to Pinecone: {str(e)}")
         return None
 
-# Initialize embedding model
+# Load embedding model
 @st.cache_resource
 def load_embedding_model():
     if EMBEDDINGS_AVAILABLE:
@@ -70,199 +104,306 @@ def load_embedding_model():
             return None
     return None
 
-# Query function
-def query_pinecone(pc, index_name, query_text, top_k=10):
+# Query function with natural language processing
+def query_campaign_data(question, top_k=5):
+    pc = init_pinecone()
+    if not pc:
+        return None
+    
+    model = load_embedding_model()
+    if not model:
+        st.warning("Semantic search not available. Install sentence-transformers.")
+        return None
+    
     try:
-        index = pc.Index(index_name)
+        index = pc.Index("campaign")
+        query_embedding = model.encode(question).tolist()
         
-        st.info(f"🔍 Searching for: '{query_text}' in index '{index_name}'")
-        
-        # Load embedding model for semantic search
-        model = load_embedding_model()
-        
-        if model:
-            # Generate embedding for the query
-            query_embedding = model.encode(query_text).tolist()
-            
-            # Perform semantic search
-            results = index.query(
-                vector=query_embedding,
-                top_k=top_k,
-                include_metadata=True
-            )
-            
-            st.success(f"✅ Using semantic search with multilingual-e5-large model")
-            
-        else:
-            # Fallback to basic search
-            st.warning("🔄 Using fallback search method")
-            results = index.query(
-                vector=[0.1] * 1024,  # multilingual-e5-large dimension
-                top_k=top_k,
-                include_metadata=True
-            )
+        results = index.query(
+            vector=query_embedding,
+            top_k=top_k,
+            include_metadata=True
+        )
         
         return results
-        
     except Exception as e:
         st.error(f"Query failed: {str(e)}")
-        st.error("💡 Check your connection and index configuration")
         return None
 
-# Main interface
-if api_key and index_name:
-    pc = init_pinecone(api_key, environment)
+# Function to process and visualize data
+def create_visualizations(results, question):
+    if not results or not results.matches:
+        return None
     
-    if pc:
-        st.success("✅ Connected to Pinecone successfully!")
-        
-        # Query section
-        st.header("🔍 Query Your Data")
-        
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            query_input = st.text_input(
-                "Enter your query:", 
-                value="_JAD Vision 1st April -7th April Dell",
-                help="Enter keywords to search your campaign data"
-            )
-        
-        with col2:
-            top_k = st.number_input("Results limit", min_value=1, max_value=50, value=10)
-        
-        if st.button("🔍 Search", type="primary"):
-            with st.spinner("Searching your data..."):
-                results = query_pinecone(pc, index_name, query_input, top_k)
-                
-                if results and results.matches:
-                    st.success(f"Found {len(results.matches)} results!")
-                    
-                    # Display results
-                    st.header("📋 Search Results")
-                    
-                    for i, match in enumerate(results.matches):
-                        with st.expander(f"Result {i+1} (Score: {match.score:.3f})", expanded=i<3):
-                            if match.metadata:
-                                # Display metadata in a structured way
-                                st.json(match.metadata)
-                            else:
-                                st.write("No metadata available")
-                    
-                    # Create visualizations if data is available
-                    st.header("📈 Data Visualization")
-                    
-                    # Sample visualization based on common J-AD Vision metrics
-                    # You'll need to adapt this based on your actual data structure
-                    try:
-                        # Extract data for visualization
-                        station_data = []
-                        performance_data = []
-                        
-                        for match in results.matches:
-                            if match.metadata:
-                                metadata = match.metadata
-                                # Adapt these fields based on your actual data structure
-                                if 'station_name' in metadata:
-                                    station_data.append({
-                                        'Station': metadata.get('station_name', 'Unknown'),
-                                        'Impressions': metadata.get('impressions', 0),
-                                        'Reach': metadata.get('reach', 0)
-                                    })
-                        
-                        if station_data:
-                            df_stations = pd.DataFrame(station_data)
-                            
-                            # Bar chart for station performance
-                            fig_bar = px.bar(
-                                df_stations, 
-                                x='Station', 
-                                y='Impressions',
-                                title='Impressions by Station',
-                                color='Reach'
-                            )
-                            fig_bar.update_xaxis(tickangle=45)
-                            st.plotly_chart(fig_bar, use_container_width=True)
-                            
-                            # Pie chart for reach distribution
-                            if len(df_stations) > 1:
-                                fig_pie = px.pie(
-                                    df_stations, 
-                                    values='Reach', 
-                                    names='Station',
-                                    title='Reach Distribution by Station'
-                                )
-                                st.plotly_chart(fig_pie, use_container_width=True)
-                    
-                    except Exception as viz_error:
-                        st.warning("Could not create visualizations. Raw data displayed above.")
-                        st.error(f"Visualization error: {str(viz_error)}")
-                
-                else:
-                    st.warning("No results found for your query. Try different keywords or check your index.")
-        
-        # Data upload section
-        st.header("📤 Upload New Data")
-        
-        uploaded_file = st.file_uploader("Upload JSON file", type=['json'])
-        
-        if uploaded_file is not None:
+    # Extract data from results
+    all_data = []
+    station_data = []
+    daily_data = []
+    hourly_data = []
+    demographic_data = []
+    
+    for match in results.matches:
+        if match.metadata and 'text' in match.metadata:
             try:
-                data = json.load(uploaded_file)
-                st.success("✅ File loaded successfully!")
+                data = json.loads(match.metadata['text'])
+                section = match.metadata.get('section', '')
                 
-                with st.expander("Preview uploaded data"):
-                    st.json(data)
+                # Categorize data based on section
+                if '新宿' in section or '品川' in section or '東京' in section or '駅' in section:
+                    # Station data
+                    if isinstance(data, dict):
+                        station_info = {
+                            'station': section.replace('J・ADビジョン　', ''),
+                            'section': section,
+                            'data': data,
+                            'score': match.score
+                        }
+                        station_data.append(station_info)
                 
-                if st.button("💾 Upload to Pinecone"):
-                    with st.spinner("Uploading data to Pinecone..."):
-                        # Here you would implement the upload logic
-                        # This is a placeholder - adapt based on your data structure
-                        st.info("Upload functionality would be implemented here based on your specific data structure and embedding strategy.")
-                        
-            except Exception as e:
-                st.error(f"Error loading file: {str(e)}")
+                elif 'Daily' in section or '日別' in section:
+                    daily_data.append({'section': section, 'data': data, 'score': match.score})
+                
+                elif 'Hourly' in section or '時間' in section:
+                    hourly_data.append({'section': section, 'data': data, 'score': match.score})
+                
+                elif 'Age' in section or 'Gender' in section or '年齢' in section or '性別' in section:
+                    demographic_data.append({'section': section, 'data': data, 'score': match.score})
+                
+                all_data.append({'section': section, 'data': data, 'score': match.score})
+                
+            except json.JSONDecodeError:
+                continue
+    
+    # Create tabs for different visualizations
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Summary", "🏢 Stations", "📅 Daily", "🕐 Hourly", "👥 Demographics"])
+    
+    with tab1:
+        st.subheader("📋 Query Results Summary")
+        
+        # Results overview
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Matches", len(results.matches))
+        with col2:
+            avg_score = sum(m.score for m in results.matches) / len(results.matches)
+            st.metric("Avg Relevance", f"{avg_score:.2f}")
+        with col3:
+            st.metric("Station Data", len(station_data))
+        with col4:
+            high_relevance = sum(1 for m in results.matches if m.score > 0.7)
+            st.metric("High Relevance", high_relevance)
+        
+        # Results table
+        st.subheader("🔍 Detailed Results")
+        results_df = []
+        for i, match in enumerate(results.matches):
+            results_df.append({
+                'Rank': i + 1,
+                'Section': match.metadata.get('section', 'Unknown'),
+                'Relevance Score': f"{match.score:.3f}",
+                'Content Preview': match.metadata.get('text', '')[:100] + "..." if match.metadata.get('text', '') else "No content"
+            })
+        
+        df = pd.DataFrame(results_df)
+        st.dataframe(df, use_container_width=True)
+    
+    with tab2:
+        st.subheader("🏢 Station Performance")
+        
+        if station_data:
+            # Create station performance chart
+            station_names = []
+            performance_metrics = []
+            
+            for station in station_data[:10]:  # Top 10 stations
+                station_names.append(station['station'])
+                # Extract performance metrics (adapt based on your data structure)
+                if isinstance(station['data'], dict):
+                    # Look for common metrics
+                    impressions = 0
+                    reach = 0
+                    
+                    # Try to extract numerical data
+                    for key, value in station['data'].items():
+                        if isinstance(value, (int, float)):
+                            if 'impression' in key.lower():
+                                impressions = value
+                            elif 'reach' in key.lower():
+                                reach = value
+                    
+                    performance_metrics.append({'Station': station['station'], 'Impressions': impressions, 'Reach': reach, 'Relevance': station['score']})
+            
+            if performance_metrics:
+                perf_df = pd.DataFrame(performance_metrics)
+                
+                # Bar chart
+                fig_bar = px.bar(perf_df, x='Station', y='Impressions', 
+                               title='Station Performance - Impressions',
+                               color='Relevance', color_continuous_scale='Viridis')
+                fig_bar.update_xaxis(tickangle=45)
+                st.plotly_chart(fig_bar, use_container_width=True)
+                
+                # Data table
+                st.subheader("📊 Station Data Table")
+                st.dataframe(perf_df, use_container_width=True)
+            
+            # Raw station data
+            st.subheader("🏢 Station Details")
+            for station in station_data[:5]:
+                with st.expander(f"📍 {station['station']} (Score: {station['score']:.3f})"):
+                    if isinstance(station['data'], dict):
+                        st.json(station['data'])
+                    else:
+                        st.write(station['data'])
+        else:
+            st.info("No station-specific data found for this query. Try asking about specific stations like '新宿駅' or '品川駅'.")
+    
+    with tab3:
+        st.subheader("📅 Daily Performance")
+        
+        if daily_data:
+            for daily in daily_data:
+                st.subheader(f"📊 {daily['section']}")
+                if isinstance(daily['data'], dict):
+                    # Try to create daily chart
+                    if any('day' in str(k).lower() or '日' in str(k) for k in daily['data'].keys()):
+                        # Create daily performance visualization
+                        daily_df = pd.DataFrame(list(daily['data'].items()), columns=['Date', 'Value'])
+                        fig_line = px.line(daily_df, x='Date', y='Value', title='Daily Performance Trend')
+                        st.plotly_chart(fig_line, use_container_width=True)
+                    
+                    st.json(daily['data'])
+                else:
+                    st.write(daily['data'])
+        else:
+            st.info("No daily performance data found. Try asking about 'daily performance' or 'day-by-day results'.")
+    
+    with tab4:
+        st.subheader("🕐 Hourly Analysis")
+        
+        if hourly_data:
+            for hourly in hourly_data:
+                st.subheader(f"⏰ {hourly['section']}")
+                if isinstance(hourly['data'], dict):
+                    # Create hourly heatmap or line chart
+                    hourly_df = pd.DataFrame(list(hourly['data'].items()), columns=['Hour', 'Value'])
+                    fig_hourly = px.bar(hourly_df, x='Hour', y='Value', title='Hourly Performance Distribution')
+                    st.plotly_chart(fig_hourly, use_container_width=True)
+                    
+                    st.json(hourly['data'])
+                else:
+                    st.write(hourly['data'])
+        else:
+            st.info("No hourly data found. Try asking about 'hourly performance' or 'peak hours'.")
+    
+    with tab5:
+        st.subheader("👥 Demographics & Audience")
+        
+        if demographic_data:
+            for demo in demographic_data:
+                st.subheader(f"👤 {demo['section']}")
+                if isinstance(demo['data'], dict):
+                    # Create demographic charts
+                    demo_df = pd.DataFrame(list(demo['data'].items()), columns=['Category', 'Count'])
+                    
+                    # Pie chart for demographics
+                    fig_pie = px.pie(demo_df, values='Count', names='Category', 
+                                   title='Demographic Distribution')
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                    
+                    st.json(demo['data'])
+                else:
+                    st.write(demo['data'])
+        else:
+            st.info("No demographic data found. Try asking about 'age groups', 'gender distribution', or 'audience demographics'.")
 
-else:
-    st.warning("⚠️ Please configure your Pinecone settings in the sidebar to get started.")
+# Main chat interface
+st.header("💬 Ask Questions About Your Campaign")
 
-# Footer with information
+# Sample questions
+st.markdown("### 🎯 Try asking:")
+sample_questions = [
+    "Show me overall performance summary",
+    "Which stations performed best?", 
+    "What are the daily trends?",
+    "Show demographic breakdown",
+    "Compare 新宿駅 vs 品川駅 performance",
+    "What were peak hours?",
+    "Show me impression data by station"
+]
+
+cols = st.columns(3)
+for i, question in enumerate(sample_questions):
+    col_idx = i % 3
+    with cols[col_idx]:
+        if st.button(question, key=f"sample_{i}"):
+            st.session_state.current_question = question
+
+# Main query input
+user_question = st.text_input(
+    "🤔 Ask anything about your Dell J-AD Vision campaign:",
+    placeholder="e.g., Show me station performance with charts and tables",
+    key="main_query"
+)
+
+if st.button("🔍 Get Analysis", type="primary") or (hasattr(st.session_state, 'current_question')):
+    question = getattr(st.session_state, 'current_question', user_question)
+    if hasattr(st.session_state, 'current_question'):
+        delattr(st.session_state, 'current_question')
+    
+    if question:
+        with st.spinner(f"🔍 Analyzing: '{question}'..."):
+            results = query_campaign_data(question, top_k=10)
+            
+            if results:
+                st.success(f"✅ Found {len(results.matches)} relevant data points!")
+                
+                # Add to chat history
+                st.session_state.chat_history.append({
+                    'question': question,
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'results_count': len(results.matches)
+                })
+                
+                # Create comprehensive analysis
+                create_visualizations(results, question)
+                
+                # Show raw insights
+                with st.expander("🔍 Raw Data Insights", expanded=False):
+                    for i, match in enumerate(results.matches[:3]):
+                        st.subheader(f"Insight {i+1}: {match.metadata.get('section', 'Unknown')}")
+                        st.write(f"**Relevance:** {match.score:.3f}")
+                        if match.metadata and 'text' in match.metadata:
+                            content = match.metadata['text'][:500]
+                            st.text_area(f"Content Preview {i+1}", content, height=100)
+            else:
+                st.error("❌ Unable to retrieve data. Please check your connection.")
+
+# Chat history in sidebar
+if st.session_state.chat_history:
+    st.sidebar.subheader("💬 Recent Questions")
+    for i, chat in enumerate(reversed(st.session_state.chat_history[-5:])):
+        with st.sidebar.expander(f"Q{len(st.session_state.chat_history)-i}: {chat['question'][:30]}..."):
+            st.write(f"**Time:** {chat['timestamp']}")
+            st.write(f"**Results:** {chat['results_count']} data points")
+
+# Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔑 Quick Setup")
+st.sidebar.markdown("### 📊 Data Overview")
 st.sidebar.markdown("""
-**Step 1:** Get your API key from [Pinecone Dashboard](https://app.pinecone.io/)
-**Step 2:** Enter "campaign" as index name  
-**Step 3:** Search for "_JAD Vision 1st April -7th April Dell"
+**Available Data:**
+- 📈 Overall performance metrics
+- 🏢 25+ station locations  
+- 📅 Daily performance (April 1-7)
+- 🕐 Hourly breakdowns
+- 👥 Age & gender demographics
+- 📱 Network summaries
 """)
 
-st.sidebar.markdown("### 📝 About")
+st.sidebar.markdown("### 💡 Tips")
 st.sidebar.markdown("""
-This app allows you to:
-- Query J-AD Vision campaign data stored in Pinecone
-- Visualize performance metrics
-- Upload new campaign data
-- Analyze station-wise performance
+- Ask specific questions for better results
+- Use station names in Japanese (新宿駅)
+- Request charts, tables, or comparisons
+- Combine multiple metrics in one query
 """)
-
-st.sidebar.markdown("### 🏢 Sample Stations")
-st.sidebar.markdown("""
-- 新宿駅東口 (Shinjuku East)
-- 品川駅中央改札内 (Shinagawa Central)
-- 東京駅丸の内地下連絡通路 (Tokyo Marunouchi)
-- 横浜駅中央通路 (Yokohama Central)
-- 池袋中央改札内 (Ikebukuro Central)
-""")
-
-# Add custom CSS
-st.markdown("""
-<style>
-    .stButton > button {
-        width: 100%;
-    }
-    .stExpander {
-        border: 1px solid #e0e0e0;
-        border-radius: 5px;
-        margin-bottom: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
