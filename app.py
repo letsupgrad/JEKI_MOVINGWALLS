@@ -14,14 +14,6 @@ try:
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
 
-# Try to import OpenAI for RAG functionality
-try:
-    import openai
-    openai.api_key = st.secrets["OPENAI_API_KEY"]
-    RAG_ENABLED = True
-except (ImportError, KeyError):
-    RAG_ENABLED = False
-
 # ==============================================================================
 # FUNCTION DEFINITIONS
 # ==============================================================================
@@ -105,64 +97,10 @@ def query_campaign_data(question, top_k=10):
         st.error(f"Query failed: {str(e)}")
         return None
 
-def generate_response_with_rag(question, results):
-    """Generates a natural language response using retrieved data (RAG)."""
-    if not RAG_ENABLED:
-        return """
-        **AI Analysis is currently unavailable.** 
-        Please configure your OpenAI API key in Streamlit secrets to enable this feature.
-        """
-    
-    if not results or not results.matches:
-        return "I couldn't find any relevant data to answer your question."
-
-    # 1. Augment: Create the context string from retrieved data
-    context = "Here is the relevant data retrieved from the J-AD Vision campaign database:\n\n"
-    for i, match in enumerate(results.matches):
-        section = match.metadata.get('section', f'Data Snippet {i+1}')
-        content = match.metadata.get('text', '{}')
-        context += f"--- Data from Section: '{section}' ---\n"
-        context += f"{content}\n"
-        context += f"--- End of Data ---\n\n"
-
-    # 2. Generate: Create the prompt and call the LLM
-    system_prompt = """
-    You are an expert data analyst AI for the Dell J-AD Vision advertising campaign.
-    Your task is to answer the user's question based ONLY on the provided data context.
-    - Analyze all data snippets provided to synthesize a comprehensive answer.
-    - If the data includes numbers, perform calculations (totals, averages, comparisons) as needed.
-    - Present your analysis in a clear, easy-to-understand format. Use markdown, bullet points, and bold text.
-    - If the provided data is insufficient to fully answer the question, clearly state that and explain what information is missing.
-    - Do not make up any information or answer questions outside of the provided context.
-    """
-    
-    user_prompt = f"""
-    User Question: "{question}"
-
-    Data Context:
-    {context}
-
-    Based on the data, provide your expert analysis:
-    """
-
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.1,
-            max_tokens=1024
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        st.error(f"Error generating AI response: {e}")
-        return "Sorry, I encountered an error while generating the AI analysis."
-
 def create_visualizations(results, question):
     """Processes retrieved data and creates appropriate visualizations in tabs."""
     if not results or not results.matches:
+        st.warning("No data found to create visualizations.")
         return
 
     # Extract and categorize data from results
@@ -185,11 +123,11 @@ def create_visualizations(results, question):
             except (json.JSONDecodeError, TypeError):
                 continue
     
-    st.header("🔎 Detailed Data Exploration")
+    st.header(f"🔎 Data Exploration for: '{question}'")
     tabs = st.tabs(["📊 Summary", "🏢 Stations", "📅 Daily", "🕐 Hourly", "👥 Demographics"])
     
     with tabs[0]:
-        st.subheader("📋 Query Results Summary")
+        st.subheader("📋 Retrieved Data Summary")
         results_df_data = [{
             'Rank': i + 1,
             'Section': match.metadata.get('section', f'Item {i+1}').replace('J・ADビジョン\u3000', ''),
@@ -212,7 +150,7 @@ def create_visualizations(results, question):
                 st.plotly_chart(fig_bar, use_container_width=True)
                 st.dataframe(perf_df, use_container_width=True)
         else:
-            st.info("No station-specific data found for this query.")
+            st.info("No station-specific data was found for this query.")
 
     with tabs[2]:
         st.subheader("📅 Daily Performance")
@@ -223,7 +161,7 @@ def create_visualizations(results, question):
                 fig_line = px.line(daily_df, x='Date', y='Value', title=f'Daily Trend: {daily_item["section"]}', markers=True)
                 st.plotly_chart(fig_line, use_container_width=True)
         else:
-            st.info("No daily performance data found.")
+            st.info("No daily performance data was found for this query.")
 
     with tabs[3]:
         st.subheader("🕐 Hourly Analysis")
@@ -234,7 +172,7 @@ def create_visualizations(results, question):
                 fig_hourly = px.bar(hourly_df, x='Hour', y='Value', title=f'Hourly Distribution: {hourly_item["section"]}')
                 st.plotly_chart(fig_hourly, use_container_width=True)
         else:
-            st.info("No hourly data found.")
+            st.info("No hourly data was found for this query.")
 
     with tabs[4]:
         st.subheader("👥 Demographics & Audience")
@@ -245,7 +183,7 @@ def create_visualizations(results, question):
                 fig_pie = px.pie(demo_df, values='Count', names='Category', title=f'Demographic Distribution: {demo_item["section"]}')
                 st.plotly_chart(fig_pie, use_container_width=True)
         else:
-            st.info("No demographic data found.")
+            st.info("No demographic data was found for this query.")
 
 # ==============================================================================
 # PAGE CONFIGURATION & STYLING
@@ -265,9 +203,6 @@ st.markdown("""
     }
     .status-card {
         background: #f0f8f0; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745;
-    }
-    .chat-message {
-        background: #e3f2fd; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 5px solid #1e88e5;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -354,21 +289,16 @@ user_question = st.text_input(
 query_to_process = st.session_state.pop('current_question', None) or (user_question if st.button("🔍 Get Analysis", type="primary") else None)
 
 if query_to_process:
-    with st.spinner(f"🔍 Retrieving data for: '{query_to_process}'..."):
+    with st.spinner(f"🔍 Searching for data related to: '{query_to_process}'..."):
         results = query_campaign_data(query_to_process)
         
         if results and results.matches:
             st.success(f"✅ Found {len(results.matches)} relevant data points!")
             
-            # --- RAG INTEGRATION ---
-            st.header("💡 AI-Powered Analysis")
-            with st.spinner("🧠 Generating insights..."):
-                ai_summary = generate_response_with_rag(query_to_process, results)
-                st.markdown(f'<div class="chat-message"><strong>🤖 J-AD Vision AI Analyst:</strong>{ai_summary}</div>', unsafe_allow_html=True)
-            
             # Add to chat history
             st.session_state.chat_history.append({'question': query_to_process, 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'results_count': len(results.matches)})
             
+            # Directly create visualizations
             create_visualizations(results, query_to_process)
         else:
             st.error("❌ Unable to retrieve data for your question. Please try rephrasing it.")
@@ -379,8 +309,7 @@ st.sidebar.markdown(f"""
 <div class="status-card">
     <h4>✅ System Status</h4>
     <p><strong>Pinecone DB:</strong> {'Connected' if init_pinecone() else 'Error'}<br>
-    <strong>Embedding Model:</strong> {'Loaded' if EMBEDDINGS_AVAILABLE else 'Not Available'}<br>
-    <strong>AI Analyst (RAG):</strong> {'Enabled' if RAG_ENABLED else 'Disabled'}</p>
+    <strong>Embedding Model:</strong> {'Loaded' if EMBEDDINGS_AVAILABLE else 'Not Available'}</p>
 </div>
 """, unsafe_allow_html=True)
 
